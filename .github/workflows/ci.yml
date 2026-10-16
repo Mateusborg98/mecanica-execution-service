@@ -1,0 +1,41 @@
+name: Execution CI
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mecanica_execution
+          POSTGRES_USER: mecanica_execution
+          POSTGRES_PASSWORD: execution_local
+        ports: ['5435:5432']
+        options: >-
+          --health-cmd "pg_isready -U mecanica_execution -d mecanica_execution"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: chmod +x mvnw
+      - run: ./mvnw -B clean verify
+      - run: ./mvnw -B verify
+        env:
+          RUN_POSTGRES_TESTS: 'true'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: execution-test-reports
+          path: |
+            target/surefire-reports
+            target/site/jacoco
+      - run: docker build -t mecanica-execution-service:ci .

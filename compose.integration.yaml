@@ -1,0 +1,72 @@
+name: mecanica-integration-local
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mecanica_execution
+      POSTGRES_USER: mecanica_execution
+      POSTGRES_PASSWORD: execution_local
+    ports: ['127.0.0.1:15435:5432']
+    volumes: ['execution_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mecanica_execution -d mecanica_execution']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  mongodb:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: billing_local
+      MONGO_INITDB_ROOT_PASSWORD: billing_local_password
+    ports: ['127.0.0.1:17018:27017']
+    volumes: ['billing_data:/data/db']
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: mecanica_local
+      RABBITMQ_DEFAULT_PASS: mecanica_local_password
+    ports: ['127.0.0.1:5673:5672', '127.0.0.1:15673:15672']
+    volumes: ['rabbit_data:/var/lib/rabbitmq']
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  execution:
+    build: .
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mecanica_execution
+      DATABASE_USERNAME: mecanica_execution
+      DATABASE_PASSWORD: execution_local
+      MESSAGING_ENABLED: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: mecanica_local
+      RABBITMQ_PASSWORD: mecanica_local_password
+    ports: ['127.0.0.1:18083:8083']
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+  billing:
+    build: ../mecanica-billing-service
+    environment:
+      MONGODB_URI: mongodb://billing_local:billing_local_password@mongodb:27017/mecanica_billing?authSource=admin
+      SERVER_ADDRESS: 0.0.0.0
+      MESSAGING_ENABLED: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: mecanica_local
+      RABBITMQ_PASSWORD: mecanica_local_password
+    ports: ['127.0.0.1:18082:8082']
+    depends_on:
+      mongodb: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+volumes:
+  execution_data:
+  billing_data:
+  rabbit_data:

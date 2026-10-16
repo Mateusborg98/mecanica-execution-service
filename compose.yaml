@@ -1,0 +1,28 @@
+name: mecanica-execution-local
+services:
+  api:
+    profiles: [app]
+    build: .
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mecanica_execution
+      DATABASE_USERNAME: mecanica_execution
+      DATABASE_PASSWORD: execution_local
+    ports: ['127.0.0.1:8083:8083']
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mecanica_execution
+      POSTGRES_USER: mecanica_execution
+      POSTGRES_PASSWORD: execution_local
+    ports: ['127.0.0.1:5435:5432']
+    volumes: ['postgres_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mecanica_execution -d mecanica_execution']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+volumes:
+  postgres_data:
