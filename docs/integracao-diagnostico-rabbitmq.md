@@ -83,10 +83,10 @@ antigos: ao habilitar a mensageria, esses registros pendentes serão enviados.
 
 ## Escopo ainda pendente
 
-Este é o primeiro trecho da comunicação distribuída, não a Saga completa. Aprovação,
-recusa, cancelamento e conclusão ainda não retornam entre os serviços. Aprovar um orçamento
-no Billing ainda não libera automaticamente o reparo. Mercado Pago, bloqueio da entrega,
-coordenação da OS e compensações entre serviços seguem pendentes.
+Este documento descreve o envio do diagnóstico. O retorno de aprovação e recusa também
+está implementado: consulte [decisão do orçamento](decisao-orcamento-rabbitmq.md).
+A Saga completa, comunicação de conclusão, Mercado Pago, bloqueio da entrega,
+coordenação da OS e demais compensações entre serviços seguem pendentes.
 
 Para estudar: comece por PublicadorDiagnostico, DiagnosticoOutboxWorker,
 RabbitDiagnosticoPublisher, DiagnosticoListener e ReceberDiagnosticoUseCase. Depois leia

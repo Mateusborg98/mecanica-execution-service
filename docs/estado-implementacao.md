@@ -27,10 +27,11 @@ Consulte [estoque e reservas](estoque-e-reservas.md).
 
 Dados inválidos: 400; inexistente: 404; estado incompatível, OS duplicada ou concorrência: 409.
 
-A liberação exige confirmação de aprovação pelo futuro adaptador de integração.
-Ela está implementada no serviço de aplicação e testada, mas não está exposta por HTTP.
-Assim, enquanto a mensageria não for implementada, um reparo criado pela API permanece
-aguardando aprovação e não pode ser iniciado. Não é necessário editar o banco para estudar.
+A liberação exige o evento de aprovação do Billing recebido por RabbitMQ.
+O consumidor transacional libera o reparo aprovado ou cancela o recusado e devolve sua reserva.
+No ambiente integrado, gere um diagnóstico e aprove o orçamento correspondente no Billing;
+o reparo passa para NA_FILA e pode ser iniciado pela API. Veja [decisão do orçamento](decisao-orcamento-rabbitmq.md).
+No modo isolado, com mensageria desligada, não há aprovação automática.
 
 ## Executar localmente
 
@@ -53,7 +54,7 @@ Para encerrar sem apagar os volumes: `docker compose --profile app down`.
 
 ## Pendências
 
-Integração com Billing/OS; revisão de diagnóstico/orçamento; Saga, eventos e compensações;
+Integração com OS e conclusão/pagamento no Billing; revisão de diagnóstico/orçamento; Saga e demais compensações;
 autenticação/autorização; implantação Kubernetes e observabilidade distribuída.
 A API atual é destinada ao desenvolvimento local e está publicada somente em loopback
 pelo Compose. A política de acesso será implementada antes da implantação compartilhada.

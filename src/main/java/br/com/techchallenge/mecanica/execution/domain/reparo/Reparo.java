@@ -34,6 +34,12 @@ public final class Reparo {
         exigir(StatusReparo.AGUARDANDO_APROVACAO);
         this.orcamentoId = orcamentoId; this.status = StatusReparo.NA_FILA;
     }
+    public void recusarOrcamento(UUID orcamentoId) {
+        if (orcamentoId == null) throw new IllegalArgumentException("Orçamento é obrigatório.");
+        if (status != StatusReparo.AGUARDANDO_APROVACAO && status != StatusReparo.CANCELADO)
+            throw new IllegalStateException("Recusa incompatível com o estado do reparo.");
+        this.orcamentoId = orcamentoId; this.status = StatusReparo.CANCELADO;
+    }
     public void iniciar(Instant agora) {
         exigir(StatusReparo.NA_FILA); validarData(agora, criadoEm);
         iniciadoEm = agora; status = StatusReparo.EM_EXECUCAO;

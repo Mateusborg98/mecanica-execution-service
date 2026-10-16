@@ -16,8 +16,9 @@ public class ReparoService {
         var reparo = new Reparo(ordemId, Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); gateway.inserir(reparo); return reparo;
     }
     public Reparo buscar(UUID id) { return registro(id).reparo(); }
-    // Chamado apenas pelo futuro adaptador que confirmar a aprovação do orçamento.
+    // Chamado pelo adaptador de decisões confirmadas pelo Billing.
     public Reparo liberar(UUID id, UUID orcamentoId) { return alterar(id, r -> r.liberar(orcamentoId)); }
+    public Reparo recusarOrcamento(UUID id, UUID orcamentoId) { return alterar(id, r -> r.recusarOrcamento(orcamentoId)); }
     public Reparo iniciar(UUID id) { return alterar(id, r -> r.iniciar(Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS))); }
     public Reparo concluir(UUID id) { return alterar(id, r -> r.concluir(Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS))); }
     public Reparo cancelar(UUID id) { return alterar(id, Reparo::cancelar); }

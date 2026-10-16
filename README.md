@@ -1,36 +1,36 @@
-# MecÃ¢nica Execution Service â€” Tech Challenge Fase 4
+# Mecânica Execution Service — Tech Challenge Fase 4
 
-MicrosserviÃ§o responsÃ¡vel pelo diagnÃ³stico, estoque e execuÃ§Ã£o dos serviÃ§os da oficina mecÃ¢nica.
+Microsserviço responsável pelo diagnóstico, estoque e execução dos serviços da oficina mecânica.
 
-Este projeto faz parte da arquitetura de microsserviÃ§os desenvolvida para o Tech Challenge da Fase 4.
+Este projeto faz parte da arquitetura de microsserviços desenvolvida para o Tech Challenge da Fase 4.
 
 ## Responsabilidades
 
-- Registrar o diagnÃ³stico e identificar as peÃ§as e os serviÃ§os necessÃ¡rios.
-- Gerenciar os catÃ¡logos de peÃ§as e serviÃ§os.
-- Controlar entradas, reservas, liberaÃ§Ãµes e consumo de estoque.
-- Gerenciar a fila de execuÃ§Ã£o das ordens aprovadas.
-- Registrar o inÃ­cio e a conclusÃ£o dos reparos.
-- Comunicar o andamento e a conclusÃ£o da execuÃ§Ã£o ao serviÃ§o de ordens de serviÃ§o.
-- Executar as compensaÃ§Ãµes de sua responsabilidade, como liberar reservas quando o trabalho ainda nÃ£o tiver sido iniciado.
+- Registrar o diagnóstico e identificar as peças e os serviços necessários.
+- Gerenciar os catálogos de peças e serviços.
+- Controlar entradas, reservas, liberações e consumo de estoque.
+- Gerenciar a fila de execução das ordens aprovadas.
+- Registrar o início e a conclusão dos reparos.
+- Comunicar o andamento e a conclusão da execução ao serviço de ordens de serviço.
+- Executar as compensações de sua responsabilidade, como liberar reservas quando o trabalho ainda não tiver sido iniciado.
 
-## Dados sob responsabilidade do serviÃ§o
+## Dados sob responsabilidade do serviço
 
-- CatÃ¡logo de peÃ§as.
-- CatÃ¡logo de serviÃ§os.
-- Estoque e suas movimentaÃ§Ãµes.
-- Reservas de peÃ§as.
-- DiagnÃ³sticos.
-- Fila de execuÃ§Ã£o.
-- Registros de inÃ­cio e conclusÃ£o dos reparos.
-- ReferÃªncias aos identificadores da OS e do operador responsÃ¡vel.
+- Catálogo de peças.
+- Catálogo de serviços.
+- Estoque e suas movimentações.
+- Reservas de peças.
+- Diagnósticos.
+- Fila de execução.
+- Registros de início e conclusão dos reparos.
+- Referências aos identificadores da OS e do operador responsável.
 
-## IntegraÃ§Ã£o com os demais serviÃ§os
+## Integração com os demais serviços
 
-- mecanica-os-service: recebimento de solicitaÃ§Ãµes e comunicaÃ§Ã£o do andamento da execuÃ§Ã£o.
-- mecanica-billing-service: fornecimento das informaÃ§Ãµes necessÃ¡rias Ã  elaboraÃ§Ã£o dos orÃ§amentos, conforme os contratos de integraÃ§Ã£o.
+- mecanica-os-service: recebimento de solicitações e comunicação do andamento da execução.
+- mecanica-billing-service: fornecimento das informações necessárias à elaboração dos orçamentos, conforme os contratos de integração.
 
-Cada microsserviÃ§o Ã© responsÃ¡vel por seus prÃ³prios dados. A comunicaÃ§Ã£o entre eles ocorre por contratos de API e mensagens, sem acesso direto ao banco de outro serviÃ§o.
+Cada microsserviço é responsável por seus próprios dados. A comunicação entre eles ocorre por contratos de API e mensagens, sem acesso direto ao banco de outro serviço.
 
 ## Status do projeto
 
@@ -48,10 +48,14 @@ Veja o [contrato de estoque e reservas](docs/estoque-e-reservas.md) e os testes 
 
 Catálogo de serviços e diagnóstico com preços preservados, repetição segura e validação
 das peças reservadas antes do início. Veja [serviços e diagnóstico](docs/servicos-e-diagnostico.md).
-O retorno da decisão do Billing e a Saga completa ainda estão pendentes.
+O retorno de aprovação/recusa está implementado; a Saga completa permanece pendente.
 
 ## Integração de diagnóstico e orçamento — 16/10/2026
 
 Execution publica diagnósticos via outbox/RabbitMQ; Billing cria orçamentos de forma
 idempotente. Veja [fluxo, execução local e limites](docs/integracao-diagnostico-rabbitmq.md).
-O retorno de aprovação/recusa e a Saga completa ainda estão pendentes.
+O retorno de aprovação/recusa está implementado; a Saga completa permanece pendente.
+
+## Aprovação e recusa integradas
+
+O Billing publica a decisão do orçamento por RabbitMQ. O Execution libera o reparo aprovado ou cancela o recusado, devolvendo reservas sem duplicidade. Consulte [o fluxo, a validação e os limites](docs/decisao-orcamento-rabbitmq.md).
