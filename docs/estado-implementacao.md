@@ -54,7 +54,7 @@ Para encerrar sem apagar os volumes: `docker compose --profile app down`.
 
 ## Pendências
 
-Integração com OS e conclusão/pagamento no Billing; revisão de diagnóstico/orçamento; Saga e demais compensações;
+Integração com OS e pagamento real no Billing; revisão de diagnóstico/orçamento; Saga e demais compensações;
 autenticação/autorização; implantação Kubernetes e observabilidade distribuída.
 A API atual é destinada ao desenvolvimento local e está publicada somente em loopback
 pelo Compose. A política de acesso será implementada antes da implantação compartilhada.
@@ -72,3 +72,5 @@ O UPDATE com versão evita que cancelar e iniciar tenham sucesso sobre a mesma v
 
 Catálogo de serviços e diagnóstico persistido também estão implementados. Consulte
 [serviços e diagnóstico](servicos-e-diagnostico.md), incluindo as regras de compatibilidade com reservas.
+
+A conclusão agora gera evento transacional (V6) e cobrança interna PENDENTE no Billing. Consulte [conclusão e cobrança](conclusao-e-cobranca.md). Mercado Pago e liberação da entrega continuam pendentes.

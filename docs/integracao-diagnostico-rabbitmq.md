@@ -85,7 +85,7 @@ antigos: ao habilitar a mensageria, esses registros pendentes serão enviados.
 
 Este documento descreve o envio do diagnóstico. O retorno de aprovação e recusa também
 está implementado: consulte [decisão do orçamento](decisao-orcamento-rabbitmq.md).
-A Saga completa, comunicação de conclusão, Mercado Pago, bloqueio da entrega,
+A comunicação de conclusão e a cobrança interna estão implementadas; veja [conclusão e cobrança](conclusao-e-cobranca.md). A Saga completa, Mercado Pago, bloqueio da entrega,
 coordenação da OS e demais compensações entre serviços seguem pendentes.
 
 Para estudar: comece por PublicadorDiagnostico, DiagnosticoOutboxWorker,

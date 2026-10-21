@@ -46,9 +46,10 @@ class DecisaoOrcamentoIntegrationTest {
             ds.setJdbcUrl(ds.getJdbcUrl() + "?currentSchema=" + schema);
         } else ds.setJdbcUrl("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         jdbc = new JdbcTemplate(ds);
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql")).execute(ds);
-        var config = new ExecutionConfig(); gateway = config.reparoGateway(jdbc);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql"), new ClassPathResource("db/migration/V6__outbox_reparos_concluidos.sql")).execute(ds);
+        var config = new ExecutionConfig();
         tx = config.transacao(new org.springframework.jdbc.datasource.DataSourceTransactionManager(ds));
+        gateway = config.reparoGateway(jdbc, tx);
         estoque = config.estoqueGateway(jdbc, tx); service = config.reparoService(gateway, estoque, tx);
         catalogo = config.estoqueService(estoque);
         diagnosticos = config.diagnosticoService(config.diagnosticoGateway(jdbc, tx));

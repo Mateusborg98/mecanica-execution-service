@@ -9,7 +9,8 @@ import br.com.techchallenge.mecanica.execution.application.*;
 import br.com.techchallenge.mecanica.execution.domain.reparo.*;
 public class ReparoJdbcGateway implements ReparoGateway {
     private final JdbcTemplate jdbc;
-    public ReparoJdbcGateway(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final Transacao tx;
+    public ReparoJdbcGateway(JdbcTemplate jdbc, Transacao tx) { this.jdbc = jdbc; this.tx = tx; }
     public void inserir(Reparo r) {
         try {
             jdbc.update("INSERT INTO reparos(id, ordem_id, criado_em, status, versao) VALUES (?, ?, ?, ?, 0)",
@@ -24,6 +25,9 @@ public class ReparoJdbcGateway implements ReparoGateway {
                     instant(rs.getTimestamp("concluido_em"))), rs.getLong("versao")), id).stream().findFirst();
     }
     public void atualizar(Registro registro) {
+        tx.executar(() -> { atualizarNaTransacao(registro); return null; });
+    }
+    private void atualizarNaTransacao(Registro registro) {
         var r = registro.reparo();
         int linhas = jdbc.update("""
                 UPDATE reparos SET orcamento_id = ?, status = ?, iniciado_em = ?, concluido_em = ?, versao = versao + 1
@@ -31,6 +35,12 @@ public class ReparoJdbcGateway implements ReparoGateway {
                 """, r.getOrcamentoId(), r.getStatus().name(), timestamp(r.getIniciadoEm()),
                 timestamp(r.getConcluidoEm()), r.getId(), registro.versao());
         if (linhas != 1) throw new ConflitoReparoException();
+        if (r.getStatus() == StatusReparo.CONCLUIDO) {
+            jdbc.update("""
+                    INSERT INTO outbox_reparos_concluidos(event_id, reparo_id, ordem_id, orcamento_id, ocorrido_em)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, r.getId(), r.getId(), r.getOrdemId(), r.getOrcamentoId(), timestamp(r.getConcluidoEm()));
+        }
     }
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
     private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value); }

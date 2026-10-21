@@ -32,7 +32,7 @@ O script usa apenas o ambiente isolado nas portas 18082/18083. Cria dados de dem
 
 ## Limites desta etapa
 
-Ainda não é uma Saga completa: faltam integração com OS, pagamento, entrega e compensações dos demais passos. Cancelamento local anterior a uma aprovação provoca uma decisão incompatível na DLQ; exige conciliação, sem reabrir o reparo automaticamente. A DLQ não é descartada nem reenviada automaticamente.
+O retorno da conclusão e a cobrança pendente também estão implementados; veja [conclusão e cobrança](conclusao-e-cobranca.md). Ainda não é uma Saga completa: faltam integração com OS, pagamento real, entrega e compensações dos demais passos. Cancelamento local anterior a uma aprovação provoca uma decisão incompatível na DLQ; exige conciliação, sem reabrir o reparo automaticamente. A DLQ não é descartada nem reenviada automaticamente.
 
 Orçamentos gerados antes desta versão não têm `reparoId` nem outbox da decisão; não são publicados retroativamente. Use novos diagnósticos para validar este fluxo. Uma migração de dados históricos deve reconstruir e conferir os vínculos antes de reenviar decisões, preservando os registros existentes.
 
