@@ -10,6 +10,9 @@ import br.com.techchallenge.mecanica.execution.application.*;
 @EnableScheduling
 @ConditionalOnProperty(name="integration.messaging.enabled", havingValue="true")
 public class OutboxConfig {
+    @Bean public InicioOutboxWorker inicioOutboxWorker(JdbcTemplate jdbc,Transacao tx,RabbitTemplate rabbit) {
+        return new InicioOutboxWorker(jdbc,tx,new RabbitInicioPublisher(rabbit),Clock.systemUTC());
+    }
     @Bean public ConclusaoOutboxWorker conclusaoOutboxWorker(JdbcTemplate jdbc, Transacao tx, RabbitTemplate rabbit) {
         return new ConclusaoOutboxWorker(jdbc,tx,new RabbitConclusaoPublisher(rabbit),Clock.systemUTC());
     }
@@ -18,4 +21,8 @@ public class OutboxConfig {
             DiagnosticoGateway diagnosticos, PublicadorDiagnostico publicador) {
         return new DiagnosticoOutboxWorker(jdbc, tx, diagnosticos, publicador, Clock.systemUTC());
     }
+    @Bean public CancelamentoOutboxWorker cancelamentoOutboxWorker(JdbcTemplate jdbc,Transacao tx,RabbitTemplate rabbit) {
+        return new CancelamentoOutboxWorker(jdbc,tx,new RabbitCancelamentoPublisher(rabbit),Clock.systemUTC());
+    }
+
 }

@@ -45,7 +45,7 @@ data e itens necessários ao orçamento; não leva as observações livres do di
 | Fila de erros | billing.diagnostico.v1.dlq |
 
 Os dois serviços declaram a mesma topologia. Há uma cópia do exemplo de contrato em
-`docs/contracts/diagnostico-registrado-v1.json` e uma fixture idêntica nos testes de cada
+`src/test/resources/contracts/diagnostico-registrado-v1.json` nos testes de cada
 repositório. O teste do produtor compara seu JSON com a fixture; o consumidor lê a sua.
 Não há biblioteca Java compartilhada obrigatória entre os serviços.
 

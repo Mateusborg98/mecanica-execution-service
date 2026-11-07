@@ -21,7 +21,13 @@ public class ReparoService {
     public Reparo recusarOrcamento(UUID id, UUID orcamentoId) { return alterar(id, r -> r.recusarOrcamento(orcamentoId)); }
     public Reparo iniciar(UUID id) { return alterar(id, r -> r.iniciar(Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS))); }
     public Reparo concluir(UUID id) { return alterar(id, r -> r.concluir(Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS))); }
-    public Reparo cancelar(UUID id) { return alterar(id, Reparo::cancelar); }
+    public Reparo cancelar(UUID id) {
+        return tx.executar(() -> {
+            var reparo = alterar(id, Reparo::cancelar);
+            gateway.registrarCancelamento(reparo, Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+            return reparo;
+        });
+    }
     private ReparoGateway.Registro registro(UUID id) {
         return gateway.buscar(id).orElseThrow(ReparoNaoEncontradoException::new);
     }

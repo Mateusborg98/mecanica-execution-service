@@ -42,4 +42,45 @@ public class RabbitTopology {
                 BindingBuilder.bind(queue).to(exchange).with(ROUTE),
                 BindingBuilder.bind(deadQueue).to(deadExchange).with(QUEUE));
     }
+    @Bean public Declarables conclusaoOsTopology() {
+        var exchange=new DirectExchange("mecanica.events",true,false);
+        var dlx=new DirectExchange("mecanica.dlx",true,false);
+        var queue=QueueBuilder.durable("os.reparo-concluido.v1").deadLetterExchange("mecanica.dlx")
+            .deadLetterRoutingKey("os.reparo-concluido.v1").build();
+        var dlq=QueueBuilder.durable("os.reparo-concluido.v1.dlq").build();
+        return new Declarables(exchange,dlx,queue,dlq,
+            BindingBuilder.bind(queue).to(exchange).with("reparo.concluido.v1"),
+            BindingBuilder.bind(dlq).to(dlx).with("os.reparo-concluido.v1"));
+    }
+    @Bean public Declarables inicioOsTopology() {
+        var exchange=new DirectExchange("mecanica.events",true,false);
+        var dlx=new DirectExchange("mecanica.dlx",true,false);
+        var queue=QueueBuilder.durable("os.reparo-iniciado.v1").deadLetterExchange("mecanica.dlx").deadLetterRoutingKey("os.reparo-iniciado.v1").build();
+        var dlq=QueueBuilder.durable("os.reparo-iniciado.v1.dlq").build();
+        return new Declarables(exchange,dlx,queue,dlq,BindingBuilder.bind(queue).to(exchange).with("reparo.iniciado.v1"),
+            BindingBuilder.bind(dlq).to(dlx).with("os.reparo-iniciado.v1"));
+    }
+    @Bean public Declarables diagnosticoOsTopology() {
+        var exchange=new DirectExchange("mecanica.events",true,false);
+        var dlx=new DirectExchange("mecanica.dlx",true,false);
+        var queue=QueueBuilder.durable("os.diagnostico.v1").deadLetterExchange("mecanica.dlx").deadLetterRoutingKey("os.diagnostico.v1").build();
+        var dlq=QueueBuilder.durable("os.diagnostico.v1.dlq").build();
+        return new Declarables(exchange,dlx,queue,dlq,BindingBuilder.bind(queue).to(exchange).with("diagnostico.registrado.v1"),
+            BindingBuilder.bind(dlq).to(dlx).with("os.diagnostico.v1"));
+    }
+    @Bean public Declarables cancelamentoTopology() {
+        var exchange=new DirectExchange("mecanica.events",true,false);
+        var dlx=new DirectExchange("mecanica.dlx",true,false);
+        var declarations=new java.util.ArrayList<Declarable>();
+        declarations.add(exchange);declarations.add(dlx);
+        for(String name:java.util.List.of("billing.reparo-cancelado.v1","os.reparo-cancelado.v1")) {
+            var queue=QueueBuilder.durable(name).deadLetterExchange("mecanica.dlx").deadLetterRoutingKey(name).build();
+            var dlq=QueueBuilder.durable(name+".dlq").build();
+            declarations.add(queue);declarations.add(dlq);
+            declarations.add(BindingBuilder.bind(queue).to(exchange).with("reparo.cancelado.v1"));
+            declarations.add(BindingBuilder.bind(dlq).to(dlx).with(name));
+        }
+        return new Declarables(declarations);
+    }
+
 }

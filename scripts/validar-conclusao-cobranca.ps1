@@ -8,6 +8,8 @@ $billing='http://127.0.0.1:18082'
 $rabbit='http://127.0.0.1:15673/api'
 $auth=[Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes('mecanica_local:mecanica_local_password'))
 $headers=@{Authorization="Basic $auth"}
+. (Join-Path $PSScriptRoot 'autenticacao-local.ps1')
+$operatorHeaders=Get-LocalOperatorHeaders
 function Wait-Health($url) {
     for ($n=0;$n -lt 30;$n++) {
         try { if ((Invoke-RestMethod "$url/actuator/health" -TimeoutSec 2).status -eq 'UP') { return } } catch {}
@@ -15,7 +17,7 @@ function Wait-Health($url) {
     }
     throw "Health failed: $url"
 }
-function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
+function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -Headers $operatorHeaders -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
 function Budget-Id($reparo) {
     $bytes=[Text.Encoding]::UTF8.GetBytes("mecanica:diagnostico:v1:$reparo")
     $md5=[Security.Cryptography.MD5]::Create()
@@ -41,7 +43,7 @@ function Publish($payload, $route='orcamento.decidido.v1') {
 
 function Wait-Status($id,$expected) {
     for($n=0;$n -lt 75;$n++) {
-        $state=Invoke-RestMethod "$execution/reparos/$id" -TimeoutSec 5
+        $state=Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$id" -TimeoutSec 5
         if($state.status -eq $expected) { return $state }
         Start-Sleep -Seconds 1
     }
@@ -93,13 +95,13 @@ $scenario=New-Scenario
 Assert-NoCharge $scenario.budget.id
 $null=Invoke-RestMethod "$billing/orcamentos/$($scenario.budget.id)/aprovar" -Method Post
 $null=Wait-Status $scenario.repair.id 'NA_FILA'
-$null=Invoke-RestMethod "$execution/reparos/$($scenario.repair.id)/iniciar" -Method Post
+$null=Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$($scenario.repair.id)/iniciar" -Method Post
 Assert-NoCharge $scenario.budget.id
 'PASS: aprovacao e inicio nao geram cobranca antecipada'
 docker compose @composeArgs stop rabbitmq
 if($LASTEXITCODE -ne 0) { throw 'Falha ao parar broker de teste' }
 try {
-    $completed=Invoke-RestMethod "$execution/reparos/$($scenario.repair.id)/concluir" -Method Post
+    $completed=Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$($scenario.repair.id)/concluir" -Method Post
     if($completed.status -ne 'CONCLUIDO') { throw 'Reparo nao concluido durante indisponibilidade' }
     Assert-NoCharge $scenario.budget.id
 } finally {

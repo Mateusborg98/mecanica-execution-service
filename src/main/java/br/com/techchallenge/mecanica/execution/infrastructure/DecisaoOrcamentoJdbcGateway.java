@@ -28,10 +28,10 @@ public class DecisaoOrcamentoJdbcGateway implements DecisaoOrcamentoGateway {
                 return null;
             }
             if (reparo.getStatus() != StatusReparo.AGUARDANDO_APROVACAO
-                    && (aprovado || reparo.getStatus() != StatusReparo.CANCELADO))
+                    && reparo.getStatus() != StatusReparo.CANCELADO)
                 throw new IllegalArgumentException("Decisão incompatível com o estado do reparo.");
-            if (aprovado) reparos.liberar(reparoId, orcamentoId);
-            else reparos.recusarOrcamento(reparoId, orcamentoId);
+            if (aprovado && reparo.getStatus() != StatusReparo.CANCELADO) reparos.liberar(reparoId, orcamentoId);
+            else if (!aprovado) reparos.recusarOrcamento(reparoId, orcamentoId);
             jdbc.update("INSERT INTO decisoes_orcamento_recebidas(event_id, orcamento_id, reparo_id, ordem_id, aprovado) VALUES (?, ?, ?, ?, ?)",
                     eventId, orcamentoId, reparoId, ordemId, aprovado);
             return null;

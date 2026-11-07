@@ -8,6 +8,8 @@ $billing='http://127.0.0.1:18082'
 $rabbit='http://127.0.0.1:15673/api'
 $auth=[Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes('mecanica_local:mecanica_local_password'))
 $headers=@{Authorization="Basic $auth"}
+. (Join-Path $PSScriptRoot 'autenticacao-local.ps1')
+$operatorHeaders=Get-LocalOperatorHeaders
 function Wait-Health($url) {
     for ($n=0;$n -lt 30;$n++) {
         try { if ((Invoke-RestMethod "$url/actuator/health" -TimeoutSec 2).status -eq 'UP') { return } } catch {}
@@ -15,7 +17,7 @@ function Wait-Health($url) {
     }
     throw "Health failed: $url"
 }
-function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
+function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -Headers $operatorHeaders -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
 function Budget-Id($reparo) {
     $bytes=[Text.Encoding]::UTF8.GetBytes("mecanica:diagnostico:v1:$reparo")
     $md5=[Security.Cryptography.MD5]::Create()
@@ -41,7 +43,7 @@ function Publish($payload, $route='orcamento.decidido.v1') {
 
 function Wait-Status($id,$expected) {
     for($n=0;$n -lt 75;$n++) {
-        $state=Invoke-RestMethod "$execution/reparos/$id" -TimeoutSec 5
+        $state=Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$id" -TimeoutSec 5
         if($state.status -eq $expected) { return $state }
         Start-Sleep -Seconds 1
     }
@@ -75,14 +77,14 @@ $a=New-Scenario
 $null=Invoke-RestMethod "$billing/orcamentos/$($a.budget.id)/aprovar" -Method Post
 $state=Wait-Status $a.repair.id 'NA_FILA'
 if($state.orcamentoId -ne $a.budget.id) { throw 'Orcamento nao vinculado ao reparo' }
-$null=Invoke-RestMethod "$execution/reparos/$($a.repair.id)/iniciar" -Method Post
+$null=Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$($a.repair.id)/iniciar" -Method Post
 # Wait until broker stats reflect the initial message before measuring the duplicate.
 Start-Sleep -Seconds 6
 $before=[long](Queue-State 'execution.orcamento.v1').message_stats.ack
 Repeat-Event $a 'APROVADO'
 Wait-Ack $before
-if((Invoke-RestMethod "$execution/reparos/$($a.repair.id)").status -ne 'EM_EXECUCAO') { throw 'Reentrega regrediu reparo' }
-if((Invoke-RestMethod "$execution/pecas/$($a.piece.id)").disponivel -ne 3) { throw 'Estoque consumido duas vezes' }
+if((Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$($a.repair.id)").status -ne 'EM_EXECUCAO') { throw 'Reentrega regrediu reparo' }
+if((Invoke-RestMethod -Headers $operatorHeaders "$execution/pecas/$($a.piece.id)").disponivel -ne 3) { throw 'Estoque consumido duas vezes' }
 'PASS: aprovacao libera reparo e reentrega preserva execucao e estoque'
 $r=New-Scenario
 # Persist the decision with the broker unavailable, then recover from the Mongo outbox.
@@ -96,13 +98,13 @@ try {
     if($LASTEXITCODE -ne 0) { throw 'Falha ao reiniciar broker' }
 }
 $null=Wait-Status $r.repair.id 'CANCELADO'
-if((Invoke-RestMethod "$execution/pecas/$($r.piece.id)").disponivel -ne 5) { throw 'Reserva nao devolvida' }
+if((Invoke-RestMethod -Headers $operatorHeaders "$execution/pecas/$($r.piece.id)").disponivel -ne 5) { throw 'Reserva nao devolvida' }
 'PASS: recusa salva com broker offline, entregue na recuperacao e reserva devolvida'
 Start-Sleep -Seconds 6
 $before=[long](Queue-State 'execution.orcamento.v1').message_stats.ack
 Repeat-Event $r 'RECUSADO'
 Wait-Ack $before
-if((Invoke-RestMethod "$execution/pecas/$($r.piece.id)").disponivel -ne 5) { throw 'Reserva devolvida duas vezes' }
+if((Invoke-RestMethod -Headers $operatorHeaders "$execution/pecas/$($r.piece.id)").disponivel -ne 5) { throw 'Reserva devolvida duas vezes' }
 'PASS: recusa repetida nao duplica devolucao de estoque'
 $beforeDlq=[long](Queue-State 'execution.orcamento.v1.dlq').messages
 Repeat-Event $r 'APROVADO'
@@ -112,7 +114,7 @@ for($n=0;$n -lt 30;$n++) {
     Start-Sleep -Seconds 1
 }
 if(-not $dead) { throw 'Decisao conflitante nao chegou a DLQ' }
-if((Invoke-RestMethod "$execution/reparos/$($r.repair.id)").status -ne 'CANCELADO') { throw 'Conflito alterou reparo' }
+if((Invoke-RestMethod -Headers $operatorHeaders "$execution/reparos/$($r.repair.id)").status -ne 'CANCELADO') { throw 'Conflito alterou reparo' }
 'PASS: decisao conflitante isolada na DLQ sem alterar reparo'
 @{aprovado=$a.repair.id;recusado=$r.repair.id}|ConvertTo-Json
 } finally { Pop-Location }

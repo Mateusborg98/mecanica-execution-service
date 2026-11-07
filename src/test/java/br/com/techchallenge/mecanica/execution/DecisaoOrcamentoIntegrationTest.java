@@ -1,10 +1,5 @@
 package br.com.techchallenge.mecanica.execution;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import java.time.*;
-import br.com.techchallenge.mecanica.execution.infrastructure.messaging.*;
-import static org.mockito.Mockito.*;
 import br.com.techchallenge.mecanica.execution.domain.diagnostico.*;
 import java.util.List;
 import java.math.BigDecimal;
@@ -15,12 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.http.MediaType;
 import br.com.techchallenge.mecanica.execution.application.*;
 import br.com.techchallenge.mecanica.execution.infrastructure.*;
-import br.com.techchallenge.mecanica.execution.presentation.*;
 import br.com.techchallenge.mecanica.execution.domain.reparo.*;
 
 class DecisaoOrcamentoIntegrationTest {
@@ -30,7 +21,6 @@ class DecisaoOrcamentoIntegrationTest {
     private EstoqueGateway estoque;
     private Transacao tx;
     private ReparoService service;
-    private MockMvc mvc;
     private EstoqueService catalogo;
     private DiagnosticoService diagnosticos;
     private String schema;
@@ -46,15 +36,13 @@ class DecisaoOrcamentoIntegrationTest {
             ds.setJdbcUrl(ds.getJdbcUrl() + "?currentSchema=" + schema);
         } else ds.setJdbcUrl("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         jdbc = new JdbcTemplate(ds);
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql"), new ClassPathResource("db/migration/V6__outbox_reparos_concluidos.sql")).execute(ds);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V9__outbox_reparos_cancelados.sql"), new ClassPathResource("db/migration/V8__outbox_reparos_iniciados.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql"), new ClassPathResource("db/migration/V6__outbox_reparos_concluidos.sql")).execute(ds);
         var config = new ExecutionConfig();
         tx = config.transacao(new org.springframework.jdbc.datasource.DataSourceTransactionManager(ds));
         gateway = config.reparoGateway(jdbc, tx);
         estoque = config.estoqueGateway(jdbc, tx); service = config.reparoService(gateway, estoque, tx);
         catalogo = config.estoqueService(estoque);
         diagnosticos = config.diagnosticoService(config.diagnosticoGateway(jdbc, tx));
-        mvc = MockMvcBuilders.standaloneSetup(new ReparoController(service), new EstoqueController(catalogo), new DiagnosticoController(diagnosticos))
-                .setControllerAdvice(new ReparoExceptionHandler()).build();
     }
     @AfterEach void limpar() {
         if (jdbc != null) {
@@ -113,8 +101,9 @@ class DecisaoOrcamentoIntegrationTest {
     }
     @Test void naoDeveLiberarReparoCancelado() {
         var id=preparar(); service.cancelar(id);
-        assertThrows(IllegalArgumentException.class,()->receber(id,true));
-        receber(id,false);
+        receber(id,true); receber(id,true);
+        assertEquals(StatusReparo.CANCELADO,service.buscar(id).getStatus());
+        assertThrows(IllegalArgumentException.class,()->receber(id,false));
         assertEquals(5,catalogo.buscar(peca(id)).disponivel());
     }
     @Test void deveRecusarReparoSemDiagnosticoEReparoInexistente() {
@@ -133,4 +122,18 @@ class DecisaoOrcamentoIntegrationTest {
         }
         assertEquals(5,catalogo.buscar(peca(id)).disponivel());
     }
+    @Test void cancelarDevolveReservaEGravaEventoUmaVez() {
+        var id=preparar();receber(id,true);service.cancelar(id);service.cancelar(id);
+        assertEquals(StatusReparo.CANCELADO,service.buscar(id).getStatus());
+        assertEquals(5,catalogo.buscar(peca(id)).disponivel());
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM outbox_reparos_cancelados",Integer.class));
+    }
+    @Test void falhaNaOutboxReverteCancelamentoEDevolucao() {
+        var id=preparar();jdbc.execute("DROP TABLE outbox_reparos_cancelados");
+        assertThrows(org.springframework.dao.DataAccessException.class,()->service.cancelar(id));
+        assertEquals(StatusReparo.AGUARDANDO_APROVACAO,service.buscar(id).getStatus());
+        assertEquals(3,catalogo.buscar(peca(id)).disponivel());
+        assertEquals(Reserva.Status.RESERVADA,catalogo.buscarReserva(id).status());
+    }
+
 }

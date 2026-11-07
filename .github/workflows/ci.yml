@@ -27,6 +27,7 @@ jobs:
           java-version: '21'
           cache: maven
       - run: chmod +x mvnw
+      - run: ./mvnw -B -f tools/dlq/pom.xml clean verify
       - run: ./mvnw -B clean verify
       - run: ./mvnw -B verify
         env:
@@ -38,4 +39,20 @@ jobs:
           path: |
             target/surefire-reports
             target/site/jacoco
+            target/pmd.xml
+            target/reports/pmd.html
+            target/cucumber
+            tools/dlq/target/surefire-reports
+            tools/dlq/target/pmd.xml
+            tools/dlq/target/reports/pmd.html
       - run: docker build -t mecanica-execution-service:ci .
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kubernetes manifests
+        run: |
+          set -euo pipefail
+          kubectl kustomize k8s > /tmp/app.yaml
+          docker run --rm -i ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary -kubernetes-version 1.36.0 < /tmp/app.yaml

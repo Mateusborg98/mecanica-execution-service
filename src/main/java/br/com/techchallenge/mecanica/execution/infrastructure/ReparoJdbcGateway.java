@@ -35,6 +35,12 @@ public class ReparoJdbcGateway implements ReparoGateway {
                 """, r.getOrcamentoId(), r.getStatus().name(), timestamp(r.getIniciadoEm()),
                 timestamp(r.getConcluidoEm()), r.getId(), registro.versao());
         if (linhas != 1) throw new ConflitoReparoException();
+        if (r.getStatus() == StatusReparo.EM_EXECUCAO) {
+            jdbc.update("""
+                    INSERT INTO outbox_reparos_iniciados(event_id, reparo_id, ordem_id, orcamento_id, ocorrido_em)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, r.getId(), r.getId(), r.getOrdemId(), r.getOrcamentoId(), timestamp(r.getIniciadoEm()));
+        }
         if (r.getStatus() == StatusReparo.CONCLUIDO) {
             jdbc.update("""
                     INSERT INTO outbox_reparos_concluidos(event_id, reparo_id, ordem_id, orcamento_id, ocorrido_em)
@@ -44,4 +50,11 @@ public class ReparoJdbcGateway implements ReparoGateway {
     }
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
     private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value); }
+    public void registrarCancelamento(Reparo r, Instant ocorridoEm) {
+        jdbc.update("""
+                INSERT INTO outbox_reparos_cancelados(event_id,reparo_id,ordem_id,ocorrido_em)
+                VALUES (?,?,?,?) ON CONFLICT DO NOTHING
+                """,r.getId(),r.getId(),r.getOrdemId(),timestamp(ocorridoEm));
+    }
+
 }

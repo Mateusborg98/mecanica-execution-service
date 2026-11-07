@@ -8,6 +8,8 @@ $billing='http://127.0.0.1:18082'
 $rabbit='http://127.0.0.1:15673/api'
 $auth=[Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes('mecanica_local:mecanica_local_password'))
 $headers=@{Authorization="Basic $auth"}
+. (Join-Path $PSScriptRoot 'autenticacao-local.ps1')
+$operatorHeaders=Get-LocalOperatorHeaders
 function Wait-Health($url) {
     for ($n=0;$n -lt 30;$n++) {
         try { if ((Invoke-RestMethod "$url/actuator/health" -TimeoutSec 2).status -eq 'UP') { return } } catch {}
@@ -15,7 +17,7 @@ function Wait-Health($url) {
     }
     throw "Health failed: $url"
 }
-function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
+function Post-Json($url,$body) { Invoke-RestMethod -Method Post -Uri $url -Headers $operatorHeaders -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 10) -TimeoutSec 10 }
 function Budget-Id($reparo) {
     $bytes=[Text.Encoding]::UTF8.GetBytes("mecanica:diagnostico:v1:$reparo")
     $hash=[Security.Cryptography.MD5]::HashData($bytes)

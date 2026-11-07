@@ -1,7 +1,6 @@
 package br.com.techchallenge.mecanica.execution;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.Test;

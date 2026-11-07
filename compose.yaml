@@ -4,6 +4,8 @@ services:
     profiles: [app]
     build: .
     environment:
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_ISSUER: ${JWT_ISSUER:-mecanica-auth}
       DATABASE_URL: jdbc:postgresql://postgres:5432/mecanica_execution
       DATABASE_USERNAME: mecanica_execution
       DATABASE_PASSWORD: execution_local

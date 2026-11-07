@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mecanica-execution-service-config
+data:
+  APP_ENVIRONMENT: fase4
+  SERVER_ADDRESS: 0.0.0.0
+  SERVER_PORT: "8083"
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 30s
+  JAVA_TOOL_OPTIONS: '-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError'
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
+  MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_INCLUDE: readinessState,db,rabbit
+  LOGGING_STRUCTURED_FORMAT_CONSOLE: logstash
+  JWT_ISSUER: mecanica-auth
+  MESSAGING_ENABLED: "true"
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  DD_LOGS_INJECTION: "true"
+  DD_PROFILING_ENABLED: "false"
+  DD_TRACE_SAMPLE_RATE: "1.0"
+  DATABASE_URL: jdbc:postgresql://postgres-execution:5432/mecanica_execution
+  DATABASE_USERNAME: mecanica_execution

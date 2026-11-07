@@ -49,6 +49,7 @@ public final class Reparo {
         concluidoEm = agora; status = StatusReparo.CONCLUIDO;
     }
     public void cancelar() {
+        if (status == StatusReparo.CANCELADO) return;
         if (status != StatusReparo.AGUARDANDO_APROVACAO && status != StatusReparo.NA_FILA)
             throw new IllegalStateException("Só é possível cancelar antes de iniciar o reparo.");
         status = StatusReparo.CANCELADO;

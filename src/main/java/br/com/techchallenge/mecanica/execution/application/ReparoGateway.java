@@ -7,4 +7,5 @@ public interface ReparoGateway {
     void inserir(Reparo reparo);
     Optional<Registro> buscar(UUID id);
     void atualizar(Registro registro);
+    void registrarCancelamento(Reparo reparo, java.time.Instant ocorridoEm);
 }
