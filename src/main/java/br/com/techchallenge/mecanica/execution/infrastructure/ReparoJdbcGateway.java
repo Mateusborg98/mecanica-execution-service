@@ -1,0 +1,77 @@
+package br.com.techchallenge.mecanica.execution.infrastructure;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
+import br.com.techchallenge.mecanica.execution.application.*;
+import br.com.techchallenge.mecanica.execution.domain.reparo.*;
+public class ReparoJdbcGateway implements ReparoGateway {
+    private final JdbcTemplate jdbc;
+    private final Transacao tx;
+    public ReparoJdbcGateway(JdbcTemplate jdbc, Transacao tx) { this.jdbc = jdbc; this.tx = tx; }
+    public void inserir(Reparo r) {
+        try {
+            jdbc.update("INSERT INTO reparos(id, ordem_id, criado_em, status, versao) VALUES (?, ?, ?, ?, 0)",
+                    r.getId(), r.getOrdemId(), Timestamp.from(r.getCriadoEm()), r.getStatus().name());
+        } catch (DuplicateKeyException exception) { throw new ConflitoReparoException(); }
+    }
+    public Optional<Registro> buscar(UUID id) {
+        return jdbc.query("SELECT * FROM reparos WHERE id = ?", (rs, row) -> new Registro(
+                Reparo.reconstituir(rs.getObject("id", UUID.class), rs.getObject("ordem_id", UUID.class),
+                    rs.getTimestamp("criado_em").toInstant(), rs.getObject("orcamento_id", UUID.class),
+                    StatusReparo.valueOf(rs.getString("status")), instant(rs.getTimestamp("iniciado_em")),
+                    instant(rs.getTimestamp("concluido_em"))), rs.getLong("versao")), id).stream().findFirst();
+    }
+    public java.util.List<Reparo> fila(int limite) {
+        return jdbc.query("SELECT * FROM reparos WHERE status='NA_FILA' ORDER BY criado_em, id LIMIT ?",
+            (rs, n) -> Reparo.reconstituir(rs.getObject("id", UUID.class), rs.getObject("ordem_id", UUID.class),
+                rs.getTimestamp("criado_em").toInstant(), rs.getObject("orcamento_id", UUID.class),
+                StatusReparo.NA_FILA, null, null), limite);
+    }
+    public Registro prepararCancelamento(UUID id, UUID ordemId, Instant agora) {
+        // A cancelled record is a durable tombstone for the ID already allocated by OS.
+        // INSERT and row lock serialize with a late repair-creation message.
+        jdbc.update("""
+            INSERT INTO reparos(id,ordem_id,criado_em,status,versao)
+            VALUES (?,?,?,'CANCELADO',0) ON CONFLICT DO NOTHING
+            """, id, ordemId, timestamp(agora));
+        var vinculos = jdbc.queryForList("SELECT ordem_id FROM reparos WHERE id=? FOR UPDATE", UUID.class, id);
+        if (vinculos.isEmpty() || !ordemId.equals(vinculos.getFirst())) throw new ConflitoReparoException();
+        return buscar(id).orElseThrow(ConflitoReparoException::new);
+    }
+    public void atualizar(Registro registro) {
+        tx.executar(() -> { atualizarNaTransacao(registro); return null; });
+    }
+    private void atualizarNaTransacao(Registro registro) {
+        var r = registro.reparo();
+        int linhas = jdbc.update("""
+                UPDATE reparos SET orcamento_id = ?, status = ?, iniciado_em = ?, concluido_em = ?, versao = versao + 1
+                WHERE id = ? AND versao = ?
+                """, r.getOrcamentoId(), r.getStatus().name(), timestamp(r.getIniciadoEm()),
+                timestamp(r.getConcluidoEm()), r.getId(), registro.versao());
+        if (linhas != 1) throw new ConflitoReparoException();
+        if (r.getStatus() == StatusReparo.EM_EXECUCAO) {
+            jdbc.update("""
+                    INSERT INTO outbox_reparos_iniciados(event_id, reparo_id, ordem_id, orcamento_id, ocorrido_em)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, r.getId(), r.getId(), r.getOrdemId(), r.getOrcamentoId(), timestamp(r.getIniciadoEm()));
+        }
+        if (r.getStatus() == StatusReparo.CONCLUIDO) {
+            jdbc.update("""
+                    INSERT INTO outbox_reparos_concluidos(event_id, reparo_id, ordem_id, orcamento_id, ocorrido_em)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, r.getId(), r.getId(), r.getOrdemId(), r.getOrcamentoId(), timestamp(r.getConcluidoEm()));
+        }
+    }
+    private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
+    private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value); }
+    public void registrarCancelamento(Reparo r, Instant ocorridoEm) {
+        jdbc.update("""
+                INSERT INTO outbox_reparos_cancelados(event_id,reparo_id,ordem_id,ocorrido_em)
+                VALUES (?,?,?,?) ON CONFLICT DO NOTHING
+                """,r.getId(),r.getId(),r.getOrdemId(),timestamp(ocorridoEm));
+    }
+
+}

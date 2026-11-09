@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "eventType": "DiagnosticoRegistrado",
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "reparoId": "11111111-1111-1111-1111-111111111111",
+  "ordemId": "22222222-2222-2222-2222-222222222222",
+  "ocorridoEm": "2026-10-16T12:00:00Z",
+  "itens": [
+    {
+      "tipo": "SERVICO",
+      "referenciaId": "33333333-3333-3333-3333-333333333333",
+      "descricao": "Inspecao",
+      "quantidade": 1,
+      "valorUnitario": 100.0
+    }
+  ]
+}
