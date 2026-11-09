@@ -42,7 +42,7 @@ O resultado fica em `%LOCALAPPDATA%\MecanicaDevTools\ultima-validacao-cancelamen
 
 ## Limites
 
-O fluxo é eventualmente consistente: a resposta do Execution confirma sua transação local; OS e Billing convergem pelo consumo assíncrono. Falhas definitivas permanecem nas DLQs para investigação. Ainda faltam a operação auditável de reprocessamento, a reconciliação de cancelamentos históricos e as regras de estorno/chargeback. Não foi executado pagamento real nem estorno no Mercado Pago.
+O fluxo é eventualmente consistente: a resposta do Execution confirma sua transação local; OS e Billing convergem pelo consumo assíncrono. Falhas definitivas permanecem nas DLQs para investigação. O reprocessamento auditável está disponível como ferramenta Java local. Permanecem fora do escopo implementado a reconciliação de cancelamentos históricos e as regras de estorno/chargeback. Não foi executado pagamento real nem estorno no Mercado Pago.
 
 ## Evidência de 04/11/2026
 
@@ -55,3 +55,11 @@ Validação local concluída em `2026-11-04T11:57:05.1283509+00:00`.
 | aprovado | `3353ff92-13d2-4288-bfc5-cd79079209a7` | `0220a3ce-3b76-4fc9-a4be-5889374e3b30` | `0f23f845-de0b-3a50-bb80-5534b0302a10` |
 
 Todos permaneceram cancelados após reentregas; estoque final 5 e nenhuma cobrança. Builds completos aprovados: OS 153 testes, Billing 155 e Execution 83; cobertura mínima atendida. Billing validado com MongoDB e Execution com PostgreSQL reais.
+
+## Extensão de 09/11/2026: cancelamento antes da criação
+
+O operador pode consultar o vínculo reservado na OS e chamar `POST /reparos/cancelamentos` no Execution com `{"reparoId":"UUID reservado","ordemId":"UUID da OS"}`. É uma operação administrativa autenticada. Não é necessário esperar a criação do reparo nem a recuperação do RabbitMQ para confirmar o cancelamento local.
+
+A transação grava o reparo CANCELADO, libera eventual reserva e registra a outbox. A criação tardia com os mesmos IDs é reconhecida sem reabrir o registro. IDs incompatíveis continuam em conflito. Chamadas repetidas preservam um único evento. OS e Billing convergem após o broker se recuperar; a resposta HTTP não promete atualização síncrona dos três bancos.
+
+Os testes de integração cobrem corrida entre criação e cancelamento, rollback se a outbox falhar e solicitação tardia. O BDD distribuído inclui indisponibilidade do RabbitMQ durante abertura e cancelamento. Os resultados devem ser consultados no relatório da execução correspondente.

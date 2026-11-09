@@ -10,7 +10,7 @@ Outbox preserva eventos junto com a mudança local; confirmação do RabbitMQ pe
 
 | Etapa | Responsável e efeito | Recuperação técnica | Compensação / limite de negócio |
 |---|---|---|---|
-| Abrir OS | OS salva atendimento e solicitação de reparo | Outbox reenvia; Execution reconhece solicitação duplicada | Rejeição definitiva na criação ainda exige reconciliação; não há evento de falha retornando à OS |
+| Abrir OS | OS salva atendimento e solicitação de reparo | Outbox reenvia; Execution reconhece solicitação duplicada | Falha definitiva exige correção/reprocessamento ou cancelamento explícito com os IDs reservados pela OS; o registro CANCELADO impede reabertura por solicitação tardia |
 | Diagnosticar | Execution preserva itens/preços e publica diagnóstico; Billing cria orçamento | Outbox e criação idempotente do orçamento | Diagnóstico não reserva automaticamente; a reserva tem operação própria |
 | Reservar peças | Execution reduz disponibilidade e registra reserva | Transação local evita reserva parcial | Recusa do orçamento libera a reserva e devolve disponibilidade |
 | Aprovar orçamento | Billing grava decisão e publica v1 para Execution e v2 para OS | Se uma publicação falhar, repete; duplicatas são reconhecidas | Reparo vai para NA_FILA; aprovação não significa pagamento |

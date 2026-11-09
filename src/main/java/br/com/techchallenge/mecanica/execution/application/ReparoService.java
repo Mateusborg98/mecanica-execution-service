@@ -16,6 +16,22 @@ public class ReparoService {
         var reparo = new Reparo(ordemId, Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); gateway.inserir(reparo); return reparo;
     }
     public Reparo buscar(UUID id) { return registro(id).reparo(); }
+    public java.util.List<Reparo> fila(int limite) {
+        if (limite < 1 || limite > 100) throw new IllegalArgumentException("Limite deve estar entre 1 e 100.");
+        return gateway.fila(limite);
+    }
+    public Reparo cancelarSolicitacao(UUID id, UUID ordemId) {
+        if (id == null || ordemId == null) throw new IllegalArgumentException("Reparo e OS são obrigatórios.");
+        return tx.executar(() -> {
+            var agora = Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            var registro = gateway.prepararCancelamento(id, ordemId, agora);
+            registro.reparo().cancelar();
+            gateway.atualizar(registro);
+            estoque.liberar(id);
+            gateway.registrarCancelamento(registro.reparo(), agora);
+            return registro.reparo();
+        });
+    }
     // Chamado pelo adaptador de decisões confirmadas pelo Billing.
     public Reparo liberar(UUID id, UUID orcamentoId) { return alterar(id, r -> r.liberar(orcamentoId)); }
     public Reparo recusarOrcamento(UUID id, UUID orcamentoId) { return alterar(id, r -> r.recusarOrcamento(orcamentoId)); }

@@ -38,7 +38,7 @@ class ReparoApiTest {
             ds.setJdbcUrl(ds.getJdbcUrl() + "?currentSchema=" + schema);
         } else ds.setJdbcUrl("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
         jdbc = new JdbcTemplate(ds);
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V9__outbox_reparos_cancelados.sql"), new ClassPathResource("db/migration/V8__outbox_reparos_iniciados.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql"), new ClassPathResource("db/migration/V6__outbox_reparos_concluidos.sql")).execute(ds);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V1__criar_reparos.sql"), new ClassPathResource("db/migration/V7__solicitacoes_reparo_recebidas.sql"), new ClassPathResource("db/migration/V9__outbox_reparos_cancelados.sql"), new ClassPathResource("db/migration/V8__outbox_reparos_iniciados.sql"), new ClassPathResource("db/migration/V2__catalogo_e_reservas.sql"), new ClassPathResource("db/migration/V3__servicos_e_diagnosticos.sql"), new ClassPathResource("db/migration/V4__outbox_diagnosticos.sql"), new ClassPathResource("db/migration/V5__inbox_decisoes_orcamento.sql"), new ClassPathResource("db/migration/V6__outbox_reparos_concluidos.sql")).execute(ds);
         var config = new ExecutionConfig();
         tx = config.transacao(new org.springframework.jdbc.datasource.DataSourceTransactionManager(ds));
         gateway = config.reparoGateway(jdbc, tx);
@@ -51,6 +51,64 @@ class ReparoApiTest {
             if (postgres) jdbc.execute("DROP SCHEMA " + schema + " CASCADE");
             ds.close();
         }
+    }
+    @Test void filaOrdenaPorCriacaoDesempataPorIdELimita() throws Exception {
+        var antigo = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var seguinte = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        for (var id : java.util.List.of(seguinte, antigo))
+            jdbc.update("INSERT INTO reparos(id,ordem_id,criado_em,status) VALUES (?,?,?,'NA_FILA')",
+                id, UUID.randomUUID(), java.sql.Timestamp.from(Instant.parse("2026-11-01T10:00:00Z")));
+        service.criar(UUID.randomUUID());
+        mvc.perform(get("/reparos/fila").param("limite","1")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(antigo.toString()));
+        assertEquals(java.util.List.of(antigo,seguinte), service.fila(100).stream().map(Reparo::getId).toList());
+        for (String limite : java.util.List.of("0","101","invalido"))
+            mvc.perform(get("/reparos/fila").param("limite",limite)).andExpect(status().isBadRequest());
+    }
+    @Test void cancelarAntesDaCriacaoImpedeMensagemTardiaEReentrega() throws Exception {
+        var ordem = UUID.randomUUID(); var id = UUID.randomUUID();
+        String body = "{\"ordemId\":\""+ordem+"\",\"reparoId\":\""+id+"\"}";
+        mvc.perform(post("/reparos/cancelamentos").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADO"));
+        var solicitacoes = new SolicitacaoReparoJdbcGateway(jdbc,tx);
+        var data = Instant.parse("2026-11-01T10:00:00Z");
+        solicitacoes.receber(ordem,id,data); solicitacoes.receber(ordem,id,data);
+        service.cancelarSolicitacao(id,ordem);
+        assertEquals(StatusReparo.CANCELADO,service.buscar(id).getStatus());
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM outbox_reparos_cancelados",Integer.class));
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM reparos",Integer.class));
+        assertThrows(IllegalStateException.class,()->service.liberar(id,UUID.randomUUID()));
+    }
+    @Test void cancelamentoAntecipadoConfereVinculoEEstado() throws Exception {
+        var r=service.criar(UUID.randomUUID());
+        assertThrows(ConflitoReparoException.class,()->service.cancelarSolicitacao(r.getId(),UUID.randomUUID()));
+        assertThrows(ConflitoReparoException.class,()->service.cancelarSolicitacao(UUID.randomUUID(),r.getOrdemId()));
+        assertThrows(IllegalArgumentException.class,()->service.cancelarSolicitacao(null,r.getOrdemId()));
+        assertThrows(IllegalArgumentException.class,()->service.cancelarSolicitacao(r.getId(),null));
+        service.liberar(r.getId(),UUID.randomUUID()); service.iniciar(r.getId());
+        assertThrows(IllegalStateException.class,()->service.cancelarSolicitacao(r.getId(),r.getOrdemId()));
+        assertEquals(StatusReparo.EM_EXECUCAO,service.buscar(r.getId()).getStatus());
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM outbox_reparos_cancelados",Integer.class));
+        mvc.perform(post("/reparos/cancelamentos").contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isBadRequest());
+    }
+    @Test void falhaNaOutboxReverteCancelamentoAntecipado() {
+        jdbc.execute("DROP TABLE outbox_reparos_cancelados");
+        var id=UUID.randomUUID();
+        assertThrows(org.springframework.dao.DataAccessException.class,()->service.cancelarSolicitacao(id,UUID.randomUUID()));
+        assertTrue(gateway.buscar(id).isEmpty());
+    }
+    @Test void criacaoECancelamentoConcorrentesConvergemParaCancelado() throws Exception {
+        var id=UUID.randomUUID();var ordem=UUID.randomUUID();
+        var solicitacoes=new SolicitacaoReparoJdbcGateway(jdbc,tx);
+        var largada=new java.util.concurrent.CountDownLatch(1);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var criar=pool.submit(()->{largada.await();solicitacoes.receber(ordem,id,Instant.parse("2026-11-01T10:00:00Z"));return null;});
+            var cancelar=pool.submit(()->{largada.await();service.cancelarSolicitacao(id,ordem);return null;});
+            largada.countDown();criar.get(10,java.util.concurrent.TimeUnit.SECONDS);cancelar.get(10,java.util.concurrent.TimeUnit.SECONDS);
+        }
+        assertEquals(StatusReparo.CANCELADO,service.buscar(id).getStatus());
+        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM outbox_reparos_cancelados",Integer.class));
     }
     @Test void deveCriarConsultarEImpedirDuplicidadePorOrdem() throws Exception {
         var ordem = UUID.randomUUID();

@@ -24,6 +24,23 @@ public class ReparoJdbcGateway implements ReparoGateway {
                     StatusReparo.valueOf(rs.getString("status")), instant(rs.getTimestamp("iniciado_em")),
                     instant(rs.getTimestamp("concluido_em"))), rs.getLong("versao")), id).stream().findFirst();
     }
+    public java.util.List<Reparo> fila(int limite) {
+        return jdbc.query("SELECT * FROM reparos WHERE status='NA_FILA' ORDER BY criado_em, id LIMIT ?",
+            (rs, n) -> Reparo.reconstituir(rs.getObject("id", UUID.class), rs.getObject("ordem_id", UUID.class),
+                rs.getTimestamp("criado_em").toInstant(), rs.getObject("orcamento_id", UUID.class),
+                StatusReparo.NA_FILA, null, null), limite);
+    }
+    public Registro prepararCancelamento(UUID id, UUID ordemId, Instant agora) {
+        // A cancelled record is a durable tombstone for the ID already allocated by OS.
+        // INSERT and row lock serialize with a late repair-creation message.
+        jdbc.update("""
+            INSERT INTO reparos(id,ordem_id,criado_em,status,versao)
+            VALUES (?,?,?,'CANCELADO',0) ON CONFLICT DO NOTHING
+            """, id, ordemId, timestamp(agora));
+        var vinculos = jdbc.queryForList("SELECT ordem_id FROM reparos WHERE id=? FOR UPDATE", UUID.class, id);
+        if (vinculos.isEmpty() || !ordemId.equals(vinculos.getFirst())) throw new ConflitoReparoException();
+        return buscar(id).orElseThrow(ConflitoReparoException::new);
+    }
     public void atualizar(Registro registro) {
         tx.executar(() -> { atualizarNaTransacao(registro); return null; });
     }

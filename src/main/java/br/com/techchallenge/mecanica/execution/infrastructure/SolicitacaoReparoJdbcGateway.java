@@ -22,10 +22,16 @@ public class SolicitacaoReparoJdbcGateway implements SolicitacaoReparoGateway {
             Instant data=jdbc.queryForObject("SELECT ocorrido_em FROM solicitacoes_reparo_recebidas WHERE event_id=?",(rs,n)->rs.getTimestamp(1).toInstant(),ordemId);
             if(!reparoId.equals(existente) || !ocorridoEm.equals(data)) throw new IllegalArgumentException("Solicitação conflitante");
             if(Boolean.TRUE.equals(row.get("processado"))) return null;
-            var antigos=jdbc.queryForList("SELECT id FROM reparos WHERE ordem_id=?",UUID.class,ordemId);
-            if(!antigos.isEmpty()) throw new IllegalArgumentException("A OS já tem reparo criado fora desta solicitação");
-            jdbc.update("INSERT INTO reparos(id,ordem_id,criado_em,status,versao) VALUES (?,?,?,'AGUARDANDO_APROVACAO',0)",
-                    reparoId,ordemId,Timestamp.from(ocorridoEm));
+            int inseridos=jdbc.update("""
+                INSERT INTO reparos(id,ordem_id,criado_em,status,versao)
+                VALUES (?,?,?,'AGUARDANDO_APROVACAO',0) ON CONFLICT DO NOTHING
+                """,reparoId,ordemId,Timestamp.from(ocorridoEm));
+            if(inseridos==0) {
+                var cancelados=jdbc.queryForList("""
+                    SELECT id FROM reparos WHERE id=? AND ordem_id=? AND status='CANCELADO' FOR UPDATE
+                    """,UUID.class,reparoId,ordemId);
+                if(cancelados.isEmpty()) throw new IllegalArgumentException("Solicitação incompatível com reparo existente");
+            }
             jdbc.update("UPDATE solicitacoes_reparo_recebidas SET processado=TRUE WHERE event_id=?",ordemId);
             return null;
         });

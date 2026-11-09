@@ -1,32 +1,32 @@
-# Decisão de tratamento das falhas da Saga — 05/11/2026
+# Política de falhas da Saga
 
-Decisão confirmada pelo responsável pelo projeto: **manter pendente para correção e reprocessamento, com cancelamento explícito pelo operador**. Uma falha técnica não representa recusa do cliente nem autorização para cancelar atendimento.
+A Saga é coreografada: cada serviço confirma sua transação local e publica eventos por outbox. Isso preserva independência dos participantes e permite repetir mensagens sem exigir transação distribuída entre PostgreSQL, MongoDB e RabbitMQ.
 
-## Regra operacional
+A decisão de negócio é manter falhas definitivas pendentes para correção/reprocessamento, com cancelamento explícito pelo operador antes da execução. Falha técnica não equivale à recusa do cliente.
 
-1. Falha temporária de banco, broker ou provedor: preservar o estado confirmado, a outbox/inbox e os identificadores originais. Os mecanismos existentes repetem a operação; não emitir uma decisão de negócio falsa.
-2. Mensagem inválida ou contraditória: isolar na DLQ e investigar causa/correlação. Não converter aprovação em recusa nem alterar o envelope para fazê-lo passar.
-3. Solicitação de reparo ou diagnóstico sem processamento definitivo: manter a OS no último estado confirmado. `publicado=true` na solicitação significa confirmação do broker, não criação do reparo.
-4. Corrigir a causa e reprocessar somente o evento original validado, usando a ferramenta Java auditável de DLQ. A confirmação de publicação não encerra a investigação: verificar a convergência pelos endpoints dos participantes.
-5. Se a decisão for cancelar, o operador usa `POST /reparos/{reparoId}/cancelar`, antes do início. Execution libera reservas e publica cancelamento; OS e Billing convergem de forma idempotente. Depois do início, o endpoint rejeita cancelamento e não devolve automaticamente peças consumidas.
+| Etapa / falha | Recuperação ou compensação |
+| --- | --- |
+| Transação local não confirmada | Rollback local; não publicar evento de sucesso |
+| Broker indisponível | Preservar outbox e repetir com os mesmos identificadores |
+| Mensagem inválida/contraditória | Isolar em DLQ, corrigir causa e reprocessar o evento original de forma auditável |
+| Reparo ainda não criado | Corrigir/reprocessar solicitação, ou cancelar explicitamente usando os IDs reservados pela OS; marcador durável impede criação tardia de reabrir atendimento |
+| Orçamento não criado | Recuperar diagnóstico preservando preços; alternativamente cancelar antes do início. Billing preserva cancelamento mesmo se diagnóstico chegar depois |
+| Orçamento recusado / cancelamento | Cancelar reparo e orçamento, liberar reservas uma única vez e projetar OS CANCELADA |
+| Decisão não propagada | Recuperar publicação/consumo sem emitir decisão contraditória |
+| Reparo já iniciado ou concluído | Recuperação para frente; preservar execução física e recuperar eventos até cobrança/OS convergirem. Cancelamento anterior à execução não se aplica |
+| Pagamento não confirmado | Consultar provedor e correlação; manter entrega bloqueada até confirmação válida |
+| SMTP indisponível | Manter pedido persistido e repetir. Falha no e-mail não aprova, recusa nem cancela orçamento |
 
-## Conferência por etapa
+## Cancelamento anterior à criação
 
-| Situação | Conferência antes de encerrar a ocorrência |
-|---|---|
-| Reparo não criado | Consultar a solicitação na OS, localizar a mensagem correlacionada e corrigir/reprocessar; confirmar o reparo pela API Execution |
-| Orçamento não criado | Preservar diagnóstico e preços; corrigir/reprocessar diagnóstico; confirmar orçamento no Billing |
-| Decisão não propagada | Confirmar estado no Billing, publicação e processamento; verificar reparo e OS; nunca emitir outra decisão contraditória |
-| Conclusão não propagada | Preservar conclusão física; recuperar publicação/consumo até existir cobrança e OS FINALIZADA |
-| Pagamento não confirmado | Consultar provedor e correlação; manter entrega bloqueada enquanto não houver confirmação válida |
-| Cancelamento solicitado | Confirmar reparo CANCELADO, reserva LIBERADA, estoque restituído uma vez e OS CANCELADA |
+Consulte `GET /ordens-servico/{ordemId}/reparo` na OS com JWT administrativo. Use exatamente os campos `reparoId` e `ordemId` retornados em `POST /reparos/cancelamentos` no Execution. Não invente identificadores. O Execution grava um registro CANCELADO mesmo se a solicitação de criação ainda estiver na outbox da OS. A solicitação tardia é reconhecida sem reabrir o reparo.
 
-## Limites explícitos
+Se já existe reparo, permanece disponível `POST /reparos/{reparoId}/cancelar`. Ambos exigem OPERADOR ou ADMINISTRADOR, rejeitam reparos iniciados/concluídos e preservam a compensação de reservas e o evento de cancelamento na mesma transação local.
 
-Não há cancelamento automático por timeout nem evento de falha que transforme a OS em cancelada. Não há painel central de incidentes; a operação usa estados das APIs, logs, outboxes/inboxes e DLQ. A ferramenta de reprocessamento atual é local; autorização/TLS/auditoria central para produção continuam necessários.
+`publicado=true` na OS indica confirmação do broker, não comprova processamento pelo Execution. Após qualquer recuperação, confira estados dos participantes e histórico da OS.
 
-Quando o reparo ainda não existe, o endpoint de cancelamento do Execution não pode ser chamado como se ele existisse. Primeiro é necessário corrigir a criação e confirmar o reparo, então solicitar seu cancelamento. Cancelar definitivamente uma OS antes de qualquer reparo existir exigiria um contrato adicional de cancelamento com proteção contra uma solicitação tardia; isso não está implementado nem é simulado como concluído.
+## Limites
 
-Ordens legadas não ganham vínculos ou eventos inventados. A migração do histórico registra somente o marco do estado conhecido. Reconciliação de dados antigos exige revisão específica.
+Não existe rollback físico de um reparo nem transação global entre serviços. Não há cancelamento automático por timeout, estorno/chargeback automático ou reconciliação de ordens legadas. Falhas após execução exigem recuperação para frente e, quando houver conflito de negócio, intervenção operacional. Se a avaliação exigir compensação financeira após pagamento, essa extensão precisa ser implementada; não está sendo apresentada como pronta.
 
-Consulte [Saga](saga.md), [cancelamento](cancelamento-integrado.md) e [reprocessamento auditável](reprocessamento-dlq.md).
+O reprocessamento auditável existe como ferramenta Java local; controles de operação em produção continuam necessários. SMTP admite duplicidade na janela entre aceitação remota e confirmação local. Consulte [cancelamento](cancelamento-integrado.md), [Saga](saga.md) e [DLQ](reprocessamento-dlq.md).

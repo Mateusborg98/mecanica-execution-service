@@ -1,103 +1,35 @@
-# Mecânica Execution Service — Tech Challenge Fase 4
+# Mecânica Execution Service — Fase 4
 
-Microsserviço responsável pelo diagnóstico, estoque e execução dos serviços da oficina mecânica.
+Microsserviço Java 21 / Spring Boot responsável por diagnóstico, catálogo, estoque e reparos. Mantém PostgreSQL próprio e comunica-se com OS e Billing por RabbitMQ, sem acessar bancos de outros serviços.
 
-Este projeto faz parte da arquitetura de microsserviços desenvolvida para o Tech Challenge da Fase 4.
+## Comportamento implementado
 
-## Responsabilidades
+Solicitações da OS criam reparos idempotentes. O diagnóstico preserva os preços dos itens e gera orçamento no Billing. A aprovação libera o reparo para a fila; a recusa cancela e libera reservas. Início e conclusão publicam progresso para a OS; a conclusão também origina a cobrança no Billing. A OS exige pagamento confirmado antes da entrega.
 
-- Registrar o diagnóstico e identificar as peças e os serviços necessários.
-- Gerenciar os catálogos de peças e serviços.
-- Controlar entradas, reservas, liberações e consumo de estoque.
-- Gerenciar a fila de execução das ordens aprovadas.
-- Registrar o início e a conclusão dos reparos.
-- Comunicar o andamento e a conclusão da execução ao serviço de ordens de serviço.
-- Executar as compensações de sua responsabilidade, como liberar reservas quando o trabalho ainda não tiver sido iniciado.
+`GET /reparos/fila?limite=50` lista somente NA_FILA, em ordem de criação do atendimento e UUID como desempate. Aceita limites de 1 a 100. A ordenação apresenta os atendimentos mais antigos entre os aprovados; não obriga o operador a iniciar somente o primeiro.
 
-## Dados sob responsabilidade do serviço
+Operações exigem JWT de OPERADOR ou ADMINISTRADOR. Consulte [permissões](docs/seguranca-e-permissoes.md).
 
-- Catálogo de peças.
-- Catálogo de serviços.
-- Estoque e suas movimentações.
-- Reservas de peças.
-- Diagnósticos.
-- Fila de execução.
-- Registros de início e conclusão dos reparos.
-- Referências aos identificadores da OS e do operador responsável.
+## Saga e compensações
 
-## Integração com os demais serviços
+A Saga coreografada evita acoplamento a um coordenador central: transações locais, outboxes e consumidores idempotentes propagam as transições. Falhas temporárias são repetidas; mensagens incompatíveis vão para DLQ. Falhas definitivas permanecem pendentes para correção ou cancelamento explícito antes da execução.
 
-- mecanica-os-service: recebimento de solicitações e comunicação do andamento da execução.
-- mecanica-billing-service: fornecimento das informações necessárias à elaboração dos orçamentos, conforme os contratos de integração.
+Cancelamentos liberam reservas uma vez e propagam CANCELADA para OS e orçamento. `POST /reparos/cancelamentos` aceita os IDs reservados pela OS e funciona mesmo antes da criação do reparo. Uma solicitação tardia não reabre o atendimento. Reparos iniciados/concluídos não têm cancelamento físico automático: usa-se recuperação para frente. Veja [política de falhas](docs/politica-falhas-saga.md) e [cancelamento](docs/cancelamento-integrado.md).
 
-Cada microsserviço é responsável por seus próprios dados. A comunicação entre eles ocorre por contratos de API e mensagens, sem acesso direto ao banco de outro serviço.
+## Executar e validar
 
-## Status do projeto
+Java 21, Docker e Maven Wrapper. Para iniciar o ambiente integrado, use `scripts/iniciar-integracao-os.ps1`. Veja [roteiro local](docs/integracao-os-conclusao.md).
 
-Em desenvolvimento. As responsabilidades descritas representam a arquitetura planejada para a Fase 4.
-## Avanço de 14/10/2026
+- `./mvnw clean verify`: testes, BDD de domínio, JaCoCo mínimo de 80% e PMD.
+- `RUN_POSTGRES_TESTS=true`: habilita a execução com PostgreSQL real; configure `TEST_POSTGRES_URL` para o banco de teste.
+- `./mvnw -B -f tests/fluxo-distribuido/pom.xml verify`: BDD com os três serviços, bancos e RabbitMQ em Docker. Mantenha os três repositórios lado a lado.
 
-Base Spring Boot executável, PostgreSQL local independente, regras do ciclo de reparo,
-testes, Dockerfile e CI com cobertura mínima de 80%.
-Consulte [o estado real da implementação e os comandos](docs/estado-implementacao.md).
-A API REST e a persistência PostgreSQL do reparo estão implementadas. Catálogo de peças, estoque e reservas transacionais também estão implementados; integração entre serviços continua pendente.
+No PowerShell use `.\mvnw.cmd`. O BDD usa pagamento simulado; não substitui a compra real de teste Mercado Pago. Os cenários distribuídos cobrem pagamento antes da entrega, recusa com restituição de estoque e cancelamento antes da criação durante indisponibilidade do broker.
 
-Veja o [contrato de estoque e reservas](docs/estoque-e-reservas.md) e os testes de concorrência.
+## Guias e entrega
 
-## Avanço de 16/10/2026
+- [Estoque e reservas](docs/estoque-e-reservas.md), [diagnóstico](docs/servicos-e-diagnostico.md) e [solicitação de reparo](docs/abertura-os-execution.md).
+- [Saga](docs/saga.md), [DLQ](docs/reprocessamento-dlq.md) e [qualidade](docs/qualidade-estatica.md).
+- [Kubernetes](k8s/README.md); infraestrutura compartilhada em `mecanica-os-service/infra/fase4`.
 
-Catálogo de serviços e diagnóstico com preços preservados, repetição segura e validação
-das peças reservadas antes do início. Veja [serviços e diagnóstico](docs/servicos-e-diagnostico.md).
-O retorno de aprovação/recusa está implementado; a Saga completa permanece pendente.
-
-## Integração de diagnóstico e orçamento — 16/10/2026
-
-Execution publica diagnósticos via outbox/RabbitMQ; Billing cria orçamentos de forma
-idempotente. Veja [fluxo, execução local e limites](docs/integracao-diagnostico-rabbitmq.md).
-O retorno de aprovação/recusa está implementado; a Saga completa permanece pendente.
-
-## Aprovação e recusa integradas
-
-O Billing publica a decisão do orçamento por RabbitMQ. O Execution libera o reparo aprovado ou cancela o recusado, devolvendo reservas sem duplicidade. Consulte [o fluxo, a validação e os limites](docs/decisao-orcamento-rabbitmq.md).
-
-## Conclusão e cobrança pendente
-
-A conclusão do reparo chega ao Billing por RabbitMQ e cria uma única cobrança interna PENDENTE, com o valor do orçamento aprovado. Não há cobrança real no Mercado Pago nesta etapa. Consulte [fluxo, falhas e demonstração](docs/conclusao-e-cobranca.md).
-
-## Solicitação de reparo pela OS
-
-O consumidor de ReparoSolicitado cria o reparo de forma idempotente. Consulte [o contrato e os limites da integração](docs/abertura-os-execution.md).
-
-
-## OS no ambiente integrado
-
-Veja [inicialização, autenticação local e roteiro de conclusão](docs/integracao-os-conclusao.md).
-
-[Progresso e valor da OS](docs/progresso-os.md) — contratos, validação integrada e limitações atuais.
-
-
-## Saga e recuperação de falhas
-
-A integração usa Saga por coreografia. Consulte [etapas, compensação de reservas, roteiro de falha e limites pendentes](docs/saga.md).
-
-
-## Cancelamento integrado
-
-Cancelamentos antes do início propagam para OS e Billing, liberam reservas e toleram reentregas. Veja [regras, contrato e roteiro de validação](docs/cancelamento-integrado.md).
-
-- [Reprocessamento auditável de DLQ](docs/reprocessamento-dlq.md): operação local, limites e evidências.
-
-- [BDD do ciclo do reparo](docs/bdd.md): cenários, execução e limites.
-
-- [Análise estática e critérios de aprovação](docs/qualidade-estatica.md): regras PMD, execução e relatórios.
-
-[Validação local de 05/11/2026](docs/validacao-2026-11-05.md): OS, Billing e BDD distribuído; limites e pendências explícitos.
-
-## Permissões de acesso
-
-As operações administrativas exigem JWT de OPERADOR ou ADMINISTRADOR. Consulte [a matriz de permissões e configuração local](docs/seguranca-e-permissoes.md). As rotas públicas de acompanhamento, orçamento e checkout permanecem conforme o contrato documentado.
-
-
-## Preparação de implantação da Fase 4
-
-Os [manifests Kubernetes](k8s/README.md) e o workflow CD estão preparados. A infraestrutura compartilhada e a estimativa de custos ficam em mecanica-os-service/infra/fase4/README.md. A preparação local não comprova provisionamento AWS ou execução remota do CD.
+Os pipelines de CI/CD são independentes. Deploy AWS/CD real e observabilidade Datadog no ambiente entregue ainda precisam de evidência. Documentos com data são registros históricos de validações, não declarações de conclusão de todas as etapas.

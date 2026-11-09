@@ -14,3 +14,7 @@ Funcionalidade: Fluxo distribuído da oficina
     Dado uma ordem aberta pela API da OS e diagnosticada pela execução
     Quando o cliente recusa o orçamento
     Então o reparo e a OS são cancelados e o estoque é restituído
+  Cenário: Cancelamento antes da criação resiste à indisponibilidade do broker
+    Dado uma ordem cuja solicitação de reparo ainda não foi publicada
+    Quando o operador cancela a solicitação antes da criação do reparo
+    Então a recuperação do broker não reabre a ordem cancelada

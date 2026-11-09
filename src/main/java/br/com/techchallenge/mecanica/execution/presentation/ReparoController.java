@@ -12,6 +12,7 @@ import br.com.techchallenge.mecanica.execution.domain.reparo.*;
 @RequestMapping("/reparos")
 public class ReparoController {
     public record CriarRequest(@NotNull UUID ordemId) {}
+    public record CancelarSolicitacaoRequest(@NotNull UUID reparoId, @NotNull UUID ordemId) {}
     public record Response(UUID id, UUID ordemId, UUID orcamentoId, StatusReparo status,
             Instant criadoEm, Instant iniciadoEm, Instant concluidoEm) {
         static Response of(Reparo r) { return new Response(r.getId(), r.getOrdemId(), r.getOrcamentoId(),
@@ -22,6 +23,12 @@ public class ReparoController {
     @PostMapping public ResponseEntity<Response> criar(@Valid @RequestBody CriarRequest request) {
         var r = service.criar(request.ordemId());
         return ResponseEntity.created(URI.create("/reparos/" + r.getId())).body(Response.of(r));
+    }
+    @GetMapping("/fila") public java.util.List<Response> fila(@RequestParam(defaultValue="50") int limite) {
+        return service.fila(limite).stream().map(Response::of).toList();
+    }
+    @PostMapping("/cancelamentos") public Response cancelarSolicitacao(@Valid @RequestBody CancelarSolicitacaoRequest request) {
+        return Response.of(service.cancelarSolicitacao(request.reparoId(), request.ordemId()));
     }
     @GetMapping("/{id}") public Response buscar(@PathVariable UUID id) { return Response.of(service.buscar(id)); }
     @PostMapping("/{id}/iniciar") public Response iniciar(@PathVariable UUID id) { return Response.of(service.iniciar(id)); }

@@ -48,7 +48,7 @@ class SolicitacaoReparoIntegrationTest {
     @Test void falhaNaCriacaoReverteInbox() {
         jdbc.update("INSERT INTO reparos(id,ordem_id,criado_em,status) VALUES (?,?,?,'AGUARDANDO_APROVACAO')",
                 reparo,UUID.randomUUID(),java.sql.Timestamp.from(data));
-        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,this::receber);
+        assertThrows(IllegalArgumentException.class,this::receber);
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM solicitacoes_reparo_recebidas",Integer.class));
     }
     @Test void concorrenciaNaoDuplicaReparo() throws Exception {

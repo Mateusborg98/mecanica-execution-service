@@ -83,13 +83,13 @@ class SecurityRoutesTest {
     }
     @Test
     void customerCannotReadInternalRepairOrStock() throws Exception {
-        for (String path : new String[]{"/reparos/id", "/pecas/id", "/servicos/id", "/reparos/id/reserva"}) {
+        for (String path : new String[]{"/reparos/fila", "/reparos/id", "/pecas/id", "/servicos/id", "/reparos/id/reserva"}) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized());
             mvc.perform(get(path).header("Authorization", bearer("CLIENTE"))).andExpect(status().isForbidden());
             mvc.perform(get(path).header("Authorization", bearer("OPERADOR"))).andExpect(status().isOk());
         }
     }
-    private static final String[] ADMIN_PATHS = new String[]{"/reparos", "/reparos/id/iniciar", "/reparos/id/concluir", "/reparos/id/cancelar", "/reparos/id/diagnostico", "/reparos/id/reserva", "/pecas", "/pecas/id/entradas", "/servicos"};
+    private static final String[] ADMIN_PATHS = new String[]{"/reparos/cancelamentos", "/reparos", "/reparos/id/iniciar", "/reparos/id/concluir", "/reparos/id/cancelar", "/reparos/id/diagnostico", "/reparos/id/reserva", "/pecas", "/pecas/id/entradas", "/servicos"};
     private static String bearer(String role) {
         return "Bearer " + token(role, ISSUER, Instant.now().plusSeconds(120), KEY);
     }

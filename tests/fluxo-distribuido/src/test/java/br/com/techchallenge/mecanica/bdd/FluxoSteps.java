@@ -27,6 +27,7 @@ public class FluxoSteps {
     private static String clientJwt;
     private static boolean started;
     private String ordem, reparo, orcamento, peca, order;
+    private boolean brokerParado;
 
     @BeforeAll public static void iniciar() throws Exception {
         root=Path.of(System.getProperty("user.dir")).toAbsolutePath();
@@ -106,6 +107,10 @@ public class FluxoSteps {
     @Quando("o cliente aprova o orçamento e o reparo é concluído") public void concluir() throws Exception {
         post(BILLING+"/orcamentos/"+orcamento+"/aprovar",null);
         await(EXECUTION+"/reparos/"+reparo,status("NA_FILA"));
+        await(EXECUTION+"/reparos/fila?limite=100", n->{
+            for(var item:n) if(reparo.equals(item.path("id").asString())) return true;
+            return false;
+        });
         post(EXECUTION+"/reparos/"+reparo+"/iniciar",null);post(EXECUTION+"/reparos/"+reparo+"/concluir",null);
         await(OS+"/ordens-servico/acompanhamento/"+ordem,status("FINALIZADA"));
         await(BILLING+"/cobrancas/"+orcamento,status("PENDENTE"));
@@ -144,5 +149,43 @@ public class FluxoSteps {
         await(EXECUTION+"/pecas/"+peca,n->n.path("disponivel").asInt()==5);
         assertEquals(404,request("GET",BILLING+"/cobrancas/"+orcamento,null,Map.of()).statusCode());
         assertEquals(409,request("POST",EXECUTION+"/reparos/"+reparo+"/iniciar",null,Map.of()).statusCode());
+    }
+
+
+    @Dado("uma ordem cuja solicitação de reparo ainda não foi publicada")
+    public void abrirSemBroker() throws Exception {
+        compose("stop","rabbitmq"); brokerParado=true;
+        var abertura=request("POST",OS+"/ordens-servico",Map.of("placa","ABC1D23","matriculaOperador",1),
+            Map.of("Authorization","Bearer "+clientJwt));
+        assertEquals(201,abertura.statusCode(),abertura.body());
+        ordem=JSON.readTree(abertura.body()).path("id").asString();
+        reparo=await(OS+"/ordens-servico/"+ordem+"/reparo",n->!n.path("reparoId").asString().isBlank()).path("reparoId").asString();
+        orcamento=UUID.nameUUIDFromBytes(("mecanica:diagnostico:v1:"+reparo).getBytes(StandardCharsets.UTF_8)).toString();
+        assertEquals(404,request("GET",EXECUTION+"/reparos/"+reparo,null,Map.of()).statusCode());
+    }
+    @Quando("o operador cancela a solicitação antes da criação do reparo")
+    public void cancelarSolicitacao() throws Exception {
+        var body=Map.of("reparoId",reparo,"ordemId",ordem);
+        for(int i=0;i<2;i++) assertEquals("CANCELADO",post(EXECUTION+"/reparos/cancelamentos",body).path("status").asString());
+    }
+    @Então("a recuperação do broker não reabre a ordem cancelada")
+    public void recuperarSemReabrir() throws Exception {
+        restaurarBroker();
+        await(OS+"/ordens-servico/"+ordem+"/reparo",n->n.path("publicado").asBoolean());
+        await(OS+"/ordens-servico/acompanhamento/"+ordem,status("CANCELADA"));
+        await(EXECUTION+"/reparos/"+reparo,status("CANCELADO"));
+        assertEquals(409,request("POST",EXECUTION+"/reparos/"+reparo+"/iniciar",null,Map.of()).statusCode());
+        assertEquals(404,request("GET",BILLING+"/cobrancas/"+orcamento,null,Map.of()).statusCode());
+        var history=await(OS+"/ordens-servico/"+ordem+"/historico",n->{
+            for(var e:n) if("CANCELAMENTO".equals(e.path("tipo").asString())) return true;
+            return false;
+        });
+        int count=0;
+        for(var e:history) if("CANCELAMENTO".equals(e.path("tipo").asString())) count++;
+        assertEquals(1,count);
+    }
+    @io.cucumber.java.After
+    public void restaurarBroker() throws Exception {
+        if(brokerParado) {compose("start","rabbitmq"); brokerParado=false;}
     }
 }

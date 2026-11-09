@@ -71,13 +71,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Mateusborg98/mecanica-os-service
-          ref: 8ab75a4a68df1db0ec6e2cf1513ad4593ef09f1c
+          ref: 21fb0c541adc75da95a125ee1b1889f37b23e860
           path: mecanica-os-service
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: Mateusborg98/mecanica-billing-service
-          ref: a576e848c9a227e8abb78422d4ff3abc3d8f40cd
+          ref: 4ba6caa9379d6771eef092b7663f2bafb5766a80
           path: mecanica-billing-service
           persist-credentials: false
       - uses: actions/setup-java@v4
