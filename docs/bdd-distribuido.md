@@ -30,3 +30,11 @@ O simulador não efetua compras nem emite links utilizáveis. Sua URL alternativ
 ## Evidência
 
 Os dois cenários passaram em 05/11/2026. [Resultado, cobertura e limites](validacao-2026-11-05.md). O módulo também aplica PMD ao simulador Java.
+
+## Execução na CI
+
+O job `distributed` do workflow `Execution CI` executa os cenários em pushes para `main`/`codex/**` e nos PRs. Usa Java 21 e runner Ubuntu 22.04, com os três repositórios em diretórios irmãos. Não usa AWS nem credenciais reais do Mercado Pago.
+
+As revisões de OS (`8ab75a4a68df1db0ec6e2cf1513ad4593ef09f1c`) e Billing (`a576e848c9a227e8abb78422d4ff3abc3d8f40cd`) estão fixadas no workflow; Execution usa a revisão em teste. O passo `Record tested revisions` registra os três commits. Atualizar esses pins em um PR quando os contratos dos outros serviços mudarem. Alterações isoladas em OS/Billing não disparam este job automaticamente: a evidência vale para a combinação de revisões registrada, não para qualquer versão futura.
+
+Os relatórios ficam no artefato `distributed-bdd-reports`. Em falha, `distributed-bdd-diagnostics` inclui o log do Compose do ambiente fictício. Há encerramento do stack mesmo se o Maven falhar. Uma execução verde deste job valida os cenários distribuídos com simulador; a compra externa continua pendente.

@@ -56,3 +56,62 @@ jobs:
           set -euo pipefail
           kubectl kustomize k8s > /tmp/app.yaml
           docker run --rm -i ghcr.io/yannh/kubeconform:v0.7.0 -strict -summary -kubernetes-version 1.36.0 < /tmp/app.yaml
+  distributed:
+    # Same MongoDB-compatible runner used by Billing CI.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mecanica-execution-service
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mecanica-execution-service
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Mateusborg98/mecanica-os-service
+          ref: 8ab75a4a68df1db0ec6e2cf1513ad4593ef09f1c
+          path: mecanica-os-service
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: Mateusborg98/mecanica-billing-service
+          ref: a576e848c9a227e8abb78422d4ff3abc3d8f40cd
+          path: mecanica-billing-service
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+      - name: Record tested revisions
+        run: |
+          for repo in mecanica-os-service mecanica-billing-service mecanica-execution-service; do
+            printf '%s: ' "$repo"
+            git -C "../$repo" rev-parse HEAD
+          done
+      - name: Run distributed Java BDD
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -f tests/fluxo-distribuido/pom.xml verify
+      - name: Stop isolated test stack
+        if: always()
+        run: docker compose -f compose.bdd.yaml down
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distributed-bdd-reports
+          retention-days: 7
+          path: |
+            mecanica-execution-service/tests/fluxo-distribuido/target/cucumber
+            mecanica-execution-service/tests/fluxo-distribuido/target/surefire-reports
+            mecanica-execution-service/tests/fluxo-distribuido/target/pmd.xml
+            mecanica-execution-service/tests/fluxo-distribuido/target/reports/pmd.html
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: distributed-bdd-diagnostics
+          retention-days: 3
+          path: mecanica-execution-service/tests/fluxo-distribuido/target/compose.log
