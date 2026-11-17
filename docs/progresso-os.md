@@ -54,6 +54,6 @@ RUN_OS_POSTGRES_TESTS=true para usar schemas isolados no PostgreSQL local da OS 
 
 - Estados antigos não são retroalimentados automaticamente; decisões v1 já publicadas
   antes da criação do consumidor v2 precisam de reconciliação explícita.
-- Fluxo financeiro real, compensações completas da Saga e histórico público ainda pendentes.
-- Rotas/regras legadas da OS ainda precisam ser removidas ou adaptadas à nova divisão.
-- Observabilidade de transições assíncronas e ambiente AWS ainda precisam ser concluídos.
+- Pagamento real e webhook do Mercado Pago permanecem pendentes de validacao externa. Os caminhos de compensacao implementados e seus limites estao em politica-falhas-saga.md.
+- OS mantem cadastros e acompanhamento; catalogo, diagnostico e reservas pertencem ao Execution, orcamento e cobranca ao Billing.
+- Deploy local na AWS e dois cenarios integrados foram validados em 16/11. CD remoto e evidencias do painel Datadog continuam pendentes.

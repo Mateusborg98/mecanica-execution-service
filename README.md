@@ -33,3 +33,12 @@ No PowerShell use `.\mvnw.cmd`. O BDD usa pagamento simulado; não substitui a c
 - [Kubernetes](k8s/README.md); infraestrutura compartilhada em `mecanica-os-service/infra/fase4`.
 
 Os pipelines de CI/CD são independentes. Deploy AWS/CD real e observabilidade Datadog no ambiente entregue ainda precisam de evidência. Documentos com data são registros históricos de validações, não declarações de conclusão de todas as etapas.
+## Revisão de entrega em 11/11/2026
+
+[Collection Postman das operações principais](docs/postman/README.md). Testes externos de pagamento e nova tentativa SMTP foram adiados pelo responsável; não representam validação concluída.
+
+[Arquitetura geral e responsabilidades](https://github.com/Mateusborg98/mecanica-os-service/blob/codex/fase4-entrega/docs/architecture-fase-4.md) e [matriz de requisitos e cobertura](https://github.com/Mateusborg98/mecanica-os-service/blob/codex/fase4-entrega/docs/matriz-requisitos-fase-4.md), centralizadas no OS Service. Disponíveis localmente no repositório irmão; links remotos dependem da publicação da revisão documental.
+
+## Swagger e demonstracao
+
+A interface esta em `/swagger-ui/index.html` e o contrato em `/v3/api-docs`. Use **Authorize** com JWT de operador/administrador para operacoes protegidas. O Swagger nao guarda autorizacao apos recarregar a pagina. Consulte o [roteiro de video](https://github.com/Mateusborg98/mecanica-os-service/blob/main/docs/roteiro-swagger-video.md).

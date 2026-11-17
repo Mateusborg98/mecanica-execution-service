@@ -81,7 +81,8 @@ class DiagnosticoApiTest {
         }
         mvc.perform(get("/reparos/" + id + "/diagnostico")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.itens[0].valorUnitario").value(25.5))
-                .andExpect(jsonPath("$.ordemId").value(service.buscar(id).getOrdemId().toString()));
+                .andExpect(jsonPath("$.ordemId").value(service.buscar(id).getOrdemId().toString()))
+                .andExpect(jsonPath("$.orcamentoId").value(UUID.nameUUIDFromBytes(("mecanica:diagnostico:v1:" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString()));
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM itens_diagnostico WHERE reparo_id = ?", Integer.class, id));
         mvc.perform(post("/reparos/" + id + "/diagnostico").contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("Trocar filtro", "Outro diagnóstico"))).andExpect(status().isConflict());
