@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mecanica-execution-service
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app: mecanica-execution-service}
+  template:
+    metadata:
+      labels:
+        app: mecanica-execution-service
+        tags.datadoghq.com/service: mecanica-execution-service
+        tags.datadoghq.com/env: fase4
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        admission.datadoghq.com/java-lib.version: "1"
+        ad.datadoghq.com/mecanica-execution-service.logs: '[{"source":"java","service":"mecanica-execution-service"}]'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mecanica-execution-service
+          image: mecanica-execution-service:release
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8083}]
+          envFrom:
+            - configMapRef: {name: mecanica-execution-service-config}
+            - secretRef: {name: mecanica-execution-service-secret}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+          startupProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /actuator/health/liveness, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}

@@ -1,0 +1,315 @@
+{
+  "info": {
+    "name": "Mecanica Fase 4 - execution",
+    "description": "Operacoes principais conferidas contra controllers em 11/11/2026. Uso manual; cenarios alternativos. Credenciais somente no ambiente local do Postman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "value": "{{jwt}}",
+        "type": "string",
+        "key": "token"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "value": "http://localhost:18083",
+      "type": "string",
+      "key": "baseUrl"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "jwt"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "ordemId"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "reparoId"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "orcamentoId"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "servicoId"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "pecaId"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "placa"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "matriculaOperador"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "destinatario"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "codigoServico"
+    },
+    {
+      "value": "",
+      "type": "string",
+      "key": "sku"
+    }
+  ],
+  "item": [
+    {
+      "response": [],
+      "name": "GET /reparos/{{reparoId}}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "GET /reparos/fila?limite=50",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/fila?limite=50",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /servicos",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/servicos",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"codigo\":\"{{codigoServico}}\",\"descricao\":\"Diagnostico de teste\",\"preco\":51.00}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "response": [],
+      "name": "GET /servicos/{{servicoId}}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/servicos/{{servicoId}}",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/{{reparoId}}/diagnostico",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/diagnostico",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"observacoes\":\"Diagnostico de teste\",\"itens\":[{\"tipo\":\"SERVICO\",\"referenciaId\":\"{{servicoId}}\",\"quantidade\":1}]}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "response": [],
+      "name": "GET /reparos/{{reparoId}}/diagnostico",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/diagnostico",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /pecas",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/pecas",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"sku\":\"{{sku}}\",\"descricao\":\"Peca de teste\",\"preco\":10.00}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "response": [],
+      "name": "GET /pecas/{{pecaId}}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/pecas/{{pecaId}}",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /pecas/{{pecaId}}/entradas",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/pecas/{{pecaId}}/entradas",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"movimentoId\":\"{{$guid}}\",\"quantidade\":5}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/{{reparoId}}/reserva",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/reserva",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"itens\":[{\"pecaId\":\"{{pecaId}}\",\"quantidade\":2}]}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "response": [],
+      "name": "GET /reparos/{{reparoId}}/reserva",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/reserva",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/{{reparoId}}/iniciar",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/iniciar",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/{{reparoId}}/concluir",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/concluir",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/{{reparoId}}/cancelar",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/reparos/{{reparoId}}/cancelar",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas."
+      }
+    },
+    {
+      "response": [],
+      "name": "POST /reparos/cancelamentos",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "value": "application/json",
+            "key": "Content-Type"
+          }
+        ],
+        "url": "{{baseUrl}}/reparos/cancelamentos",
+        "description": "Operação manual. Preencha os identificadores com respostas do ambiente. Não execute toda a collection em sequência: aprovação e recusa são alternativas.",
+        "body": {
+          "raw": "{\"reparoId\":\"{{reparoId}}\",\"ordemId\":\"{{ordemId}}\"}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Mecanica reliability" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+  <description>Regras de defeitos e código sem uso. Não impõe formatação nem substitui testes ou revisão de segurança.</description>
+  <rule ref="category/java/errorprone.xml/BrokenNullCheck"/>
+  <rule ref="category/java/errorprone.xml/CompareObjectsWithEquals"/>
+  <rule ref="category/java/errorprone.xml/EqualsNull"/>
+  <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
+  <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
+  <rule ref="category/java/errorprone.xml/UnusedNullCheckInEquals"/>
+  <rule ref="category/java/errorprone.xml/UseEqualsToCompareStrings"/>
+  <rule ref="category/java/errorprone.xml/EmptyCatchBlock"/>
+  <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+  <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+  <rule ref="category/java/codestyle.xml/EmptyControlStatement"/>
+</ruleset>

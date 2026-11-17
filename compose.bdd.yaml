@@ -1,0 +1,116 @@
+name: mecanica-bdd-local
+services:
+  postgres-os:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mecanica_os
+      POSTGRES_USER: mecanica_os
+      POSTGRES_PASSWORD: mecanica_os_local
+    ports: ['127.0.0.1:25434:5432']
+    volumes: ['os_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mecanica_os -d mecanica_os']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  os:
+    build: ../mecanica-os-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-os:5432/mecanica_os
+      SPRING_DATASOURCE_USERNAME: mecanica_os
+      SPRING_DATASOURCE_PASSWORD: mecanica_os_local
+      SERVER_PORT: 8081
+      JWT_PUBLIC_KEY: ${OS_INTEGRATION_PUBLIC_KEY:-}
+      JWT_ISSUER: mecanica-bdd-local
+      MESSAGING_ENABLED: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: mecanica_local
+      RABBITMQ_PASSWORD: mecanica_local_password
+    ports: ['127.0.0.1:28081:8081']
+    depends_on:
+      postgres-os: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mecanica_execution
+      POSTGRES_USER: mecanica_execution
+      POSTGRES_PASSWORD: execution_local
+    ports: ['127.0.0.1:25435:5432']
+    volumes: ['execution_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mecanica_execution -d mecanica_execution']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  mongodb:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: billing_local
+      MONGO_INITDB_ROOT_PASSWORD: billing_local_password
+    ports: ['127.0.0.1:27019:27017']
+    volumes: ['billing_data:/data/db']
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "quit(db.adminCommand('ping').ok ? 0 : 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: mecanica_local
+      RABBITMQ_DEFAULT_PASS: mecanica_local_password
+    ports: ['127.0.0.1:25673:5672', '127.0.0.1:25674:15672']
+    volumes: ['rabbit_data:/var/lib/rabbitmq']
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  execution:
+    build: .
+    environment:
+      JWT_PUBLIC_KEY: ${OS_INTEGRATION_PUBLIC_KEY:-}
+      JWT_ISSUER: mecanica-bdd-local
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mecanica_execution
+      DATABASE_USERNAME: mecanica_execution
+      DATABASE_PASSWORD: execution_local
+      MESSAGING_ENABLED: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: mecanica_local
+      RABBITMQ_PASSWORD: mecanica_local_password
+    ports: ['127.0.0.1:28083:8083']
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+  billing:
+    build: ../mecanica-billing-service
+    environment:
+      JWT_PUBLIC_KEY: ${OS_INTEGRATION_PUBLIC_KEY:-}
+      JWT_ISSUER: mecanica-bdd-local
+      MONGODB_URI: mongodb://billing_local:billing_local_password@mongodb:27017/mecanica_billing?authSource=admin
+      SERVER_ADDRESS: 0.0.0.0
+      SPRING_PROFILES_ACTIVE: bdd
+      MERCADO_PAGO_ACCESS_TOKEN: bdd-token-not-real
+      MERCADO_PAGO_WEBHOOK_ENABLED: 'true'
+      MERCADO_PAGO_WEBHOOK_SECRET: bdd-webhook-secret-not-real
+      MERCADO_PAGO_ORDERS_URL: http://provider:8090/v1/orders
+      MESSAGING_ENABLED: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: mecanica_local
+      RABBITMQ_PASSWORD: mecanica_local_password
+    ports: ['127.0.0.1:28082:8082']
+    depends_on:
+      mongodb: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+  provider:
+    build: ./tests/fluxo-distribuido
+    ports: ['127.0.0.1:28090:8090']
+volumes:
+  execution_data:
+  billing_data:
+  rabbit_data:
+  os_data:
